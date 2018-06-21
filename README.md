@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/adedayo/tcpscan.svg?branch=master)](https://travis-ci.org/adedayo/tcpscan)
+
 # TCPScan 
 TCPScan is a simple utility for discovering open (or closed) TCP ports on servers. It uses `gopacket`(https://github.com/google/gopacket) to craft SYN packets, listening asynchronously for (SYN-)ACK or RST responses without completing the full TCP handshake. TCPScan uses goroutines for asynchronous scans and it searches for the most likely listening ports first, using NMap's "port frequency" ordering. Anecdotal results show that TCPScan is really fast!
 
@@ -64,8 +66,6 @@ brew tap adedayo/tap
 brew install tcpscan
 ``` 
 
-
-TODO
 ### Scanning CIDR ranges
 
 ```bash
