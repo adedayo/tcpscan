@@ -1,0 +1,36 @@
+builds:
+- main: ./cmd/tcpscan/tcpscan.go
+  env:
+    - CGO_ENABLED=0
+  goos: 
+    - darwin
+    - linux
+    - windows
+  goarch:
+    - amd64
+archive:
+  replacements:
+    darwin: Darwin
+    linux: Linux
+    windows: Windows
+    386: i386
+    amd64: x86_64
+  format_overrides:
+    - goos: windows
+      format: zip
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ .Tag }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'
+brew:
+  github:
+    owner: adedayo
+    name: homebrew-tap
+  homepage: "https://github.com/adedayo/tcpscan"
+  description: "TCPScan is a simple utility for discovering open (or closed) TCP ports on servers. It uses gopacket(https://github.com/google/gopacket) to craft SYN packets, listening asynchronously for (SYN-)ACK or RST responses without completing the full TCP handshake. TCPScan uses goroutines for asynchronous scans and it searches for the most likely listening ports first, using NMap's "port frequency" ordering. Anecdotal results show that TCPScan is really fast!"
