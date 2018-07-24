@@ -1,8 +1,24 @@
 language: go
 go:
-  - 1.10.x
+- 1.10.x
 before_install:
-  - sudo apt-get install libpcap-dev flex bison
-  - go get github.com/mattn/goveralls
+- sudo apt-get install -y git cmake flex bison
+- go get github.com/mattn/goveralls
+install:
+- export PCAP_VERSION=1.9.0
+- wget https://github.com/the-tcpdump-group/libpcap/archive/libpcap-$PCAP_VERSION.tar.gz
+- mkdir libpcap 
+- tar xzf libpcap-$PCAP_VERSION.tar.gz -C libpcap --strip-components 1
+- pushd libpcap
+- cmake . && make && sudo make install
+- popd
 script:
-  - $GOPATH/bin/goveralls -service=travis-ci
+- "$GOPATH/bin/goveralls -service=travis-ci"
+deploy:
+  provider: releases
+  api_key:
+    secure: gECiYO8LFe749Hi44TRCrigHs7Ryf0mZB1IcCCXM6XE2c9nzalydqpNfGMmqNez5ddBVcHWj+E6CxtRBm1taFdSjrAxq5D0IOyv3HqrpowpdtahX8OIC08OThiM5LPQh5ch66bayKd5v8Lemspzc6SnRj3Qti6yv5OsTc7/ccIioJHJQ3kFhXE2Lr1hT2UKQHk/SrAjDX5mtId1CmJOq5VyQo5q/r2XSGjZyILgfE0d6rG3qHmIA5p9rw9uJYArZcQAmUXBQbBIcIWBeMYd8cLQu8nXia48M298c1zEGHaKMZflhWNFlfDxIPXb12hcfqAKY0q5GjzvIiQSdgaaoQiIoDOAFqg76nhNBsFMWyDvwaqC8NzSbNIEG35jslquqFa8qvjSwP26vHR8gV/fW60q6z0SkOK+/3lkejUvUYI7fOu1UCCHnXXsHI77ojSKeO+dXQotNYdOijWUATmrh0mrpEfLyK3nho61TVuDYjLsGwR6gZTFQV+jniHX1pTsnBTFPs7KFz8jyn5FXvG4vKcLeZAmc7JVaiZjo4TYVn77ApRvNI6llsvlxuhGP6orfwV92/XGbhjF2t6TlU88gvTwb6FrXaS3FqWTzMmrCERelcrdY0RvjPk4863xHvGJWWsPx2QuOZ4Hgn/w2QbDezfSreYNNc2LVQ6b6wTWVs9E=
+  file: encrypted.api.key
+  skip_cleanup: true
+  on:
+    tags: true
