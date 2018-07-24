@@ -17,7 +17,9 @@ before_install:
 # - go get github.com/google/gopacket
 # - go get github.com/urfave/cli
 # - go get github.com/mattn/goveralls
-# script:
+script:
+  - echo hello
+  - ls -alsh
 # - "$GOPATH/bin/goveralls -service=travis-ci"
 deploy:
   provider: releases
