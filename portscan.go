@@ -257,7 +257,19 @@ func getPreferredDevice() (pcap.Interface, net.Interface, error) {
 		}
 	}
 
-	return pcap.Interface{}, net.Interface{}, errors.New("Could not find a preferred interface")
+	//at this point no en0 or eth0 found. Attempt to use any first interface with a non-loopback IP :-S
+	for _, dev := range devices {
+		ip := dev.Addresses[0].IP
+		if !ip.IsLoopback() {
+			iface, err := net.InterfaceByName(dev.Name)
+			if err != nil {
+				return dev, net.Interface{}, err
+			}
+			return dev, *iface, err
+		}
+	}
+	// give up and bail out
+	return pcap.Interface{}, net.Interface{}, errors.New("Could not find a preferred interface with a routable IP")
 }
 
 func getIPv4InterfaceAddress(iface pcap.Interface) (pcap.InterfaceAddress, error) {
