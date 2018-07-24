@@ -3,7 +3,7 @@ go:
 - 1.10.x
 gobuild_args: -a -tags pcap -ldflags '-w -extldflags "-static"'
 before_install:
-- sudo apt-get install -y git cmake flex bison
+- sudo apt-get install git cmake flex bison
 - export PCAP_VERSION=1.9.0
 - wget https://github.com/the-tcpdump-group/libpcap/archive/libpcap-$PCAP_VERSION.tar.gz
 - mkdir libpcap 
@@ -11,8 +11,8 @@ before_install:
 - pushd libpcap
 - cmake . && make && sudo make install
 - popd
-- go get ./...
-- go get -a -tags pcap -ldflags '-w -extldflags "-static"' github.com/adedayo/tcpscan/cmd/tcpscan
+# - go get ./...
+# - go get -a -tags pcap -ldflags '-w -extldflags "-static"' github.com/adedayo/tcpscan/cmd/tcpscan
 # - go get github.com/adedayo/cidr
 # - go get github.com/google/gopacket
 # - go get github.com/urfave/cli
