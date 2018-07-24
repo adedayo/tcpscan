@@ -18,8 +18,9 @@ before_install:
 # - go get github.com/urfave/cli
 # - go get github.com/mattn/goveralls
 script:
-  - echo hello
-  - ls -alsh "$GOPATH/bin"
+  - echo $TRAVIS_BUILD_DIR
+  - ls -alsh $TRAVIS_BUILD_DIR
+
 
 # - "$GOPATH/bin/goveralls -service=travis-ci"
 deploy:
