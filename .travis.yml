@@ -19,7 +19,8 @@ before_install:
 # - go get github.com/mattn/goveralls
 script:
   - echo hello
-  - ls -alsh
+  - ls -alsh "$GOPATH/bin"
+
 # - "$GOPATH/bin/goveralls -service=travis-ci"
 deploy:
   provider: releases
