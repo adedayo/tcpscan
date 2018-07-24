@@ -11,7 +11,7 @@ before_install:
 - pushd libpcap
 - cmake . && make && sudo make install
 - popd
-# - go get ./...
+- go get ./...
 # - go get -a -tags pcap -ldflags '-w -extldflags "-static"' github.com/adedayo/tcpscan/cmd/tcpscan
 # - go get github.com/adedayo/cidr
 # - go get github.com/google/gopacket
