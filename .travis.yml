@@ -1,6 +1,7 @@
 language: go
 go:
 - 1.10.x
+gobuild_args: -a -tags pcap -ldflags '-w -extldflags "-static"'
 before_install:
 - sudo apt-get install -y git cmake flex bison
 - export PCAP_VERSION=1.9.0
