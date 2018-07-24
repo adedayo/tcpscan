@@ -3,8 +3,10 @@ go:
 - 1.10.x
 before_install:
 - sudo apt-get install -y git cmake flex bison
-- go get github.com/adedayo/cidr
-- go get github.com/google/gopacket
+- go get ./...
+# - go get github.com/adedayo/cidr
+# - go get github.com/google/gopacket
+# - go get github.com/urfave/cli
 # - go get github.com/mattn/goveralls
 install:
 - export PCAP_VERSION=1.9.0
