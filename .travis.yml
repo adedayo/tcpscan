@@ -5,7 +5,6 @@ gobuild_args: -a -tags pcap -ldflags '-w -extldflags "-static"'
 before_install:
 - sudo apt-get install git cmake flex bison
 - export PCAP_VERSION=1.9.0
-- export OUT_FILE="tcpscan_$(git describe --abbrev=0 --tags)_Linux_x86_64.tar.gz"
 - wget https://github.com/the-tcpdump-group/libpcap/archive/libpcap-$PCAP_VERSION.tar.gz
 - mkdir libpcap 
 - tar xzf libpcap-$PCAP_VERSION.tar.gz -C libpcap --strip-components 1
@@ -19,8 +18,10 @@ before_install:
 # - go get github.com/urfave/cli
 # - go get github.com/mattn/goveralls
 script:
+  - export OUT_FILE="tcpscan_$(git describe --abbrev=0 --tags)_Linux_x86_64.tar.gz"
   - echo $OUTFILE
   - ls -alsh $TRAVIS_BUILD_DIR
+  - make
 
 
 # - "$GOPATH/bin/goveralls -service=travis-ci"
