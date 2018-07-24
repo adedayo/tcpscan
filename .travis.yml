@@ -16,7 +16,7 @@ before_install:
 # - go get github.com/urfave/cli
 # - go get github.com/mattn/goveralls
 install:
-- sudo GOOS=linux GOARCH=amd64 go install -i -a -tags pcap -ldflags '-w -extldflags "-static"' github.com/adedayo/tcpscan/cmd/tcpscan
+- sudo go install -i -a -tags pcap -ldflags '-w -extldflags "-static"' github.com/adedayo/tcpscan/cmd/tcpscan
 # script:
 # - "$GOPATH/bin/goveralls -service=travis-ci"
 deploy:
