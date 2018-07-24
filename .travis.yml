@@ -3,12 +3,6 @@ go:
 - 1.10.x
 before_install:
 - sudo apt-get install -y git cmake flex bison
-- go get ./...
-# - go get github.com/adedayo/cidr
-# - go get github.com/google/gopacket
-# - go get github.com/urfave/cli
-# - go get github.com/mattn/goveralls
-install:
 - export PCAP_VERSION=1.9.0
 - wget https://github.com/the-tcpdump-group/libpcap/archive/libpcap-$PCAP_VERSION.tar.gz
 - mkdir libpcap 
@@ -16,6 +10,13 @@ install:
 - pushd libpcap
 - cmake . && make && sudo make install
 - popd
+- go get ./...
+# - go get github.com/adedayo/cidr
+# - go get github.com/google/gopacket
+# - go get github.com/urfave/cli
+# - go get github.com/mattn/goveralls
+install:
+- echo hello
 # script:
 # - "$GOPATH/bin/goveralls -service=travis-ci"
 deploy:
