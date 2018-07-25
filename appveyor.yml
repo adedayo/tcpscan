@@ -12,12 +12,6 @@ stack: go 1.10
 
 platform: x64
 
-
-install:
-  - cinst winflexbison
-  - win_flex --version
-  - win_bison --version
-  
 install:
   - cinst winflexbison
   - win_flex --version
