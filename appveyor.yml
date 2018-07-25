@@ -14,8 +14,8 @@ platform: x64
 install:
  - appveyor DownloadFile https://github.com/the-tcpdump-group/libpcap/archive/libpcap-1.9.0.zip
  - dir
- - 7z x libpcap-1.9.0.zip 
- - dir
+ - 7z x libpcap-1.9.0.zip -olibpcap
+ - dir libpcap
 
 before_build:
  - go get ./...
