@@ -20,11 +20,6 @@ before_install:
 script:
   - make
 
-after_success:
-  - export OUT_FILE="tcpscan_$(git describe --abbrev=0 --tags)_Linux_x86_64.tar.gz"
-  - echo $OUTFILE
-  - ls -alsh $TRAVIS_BUILD_DIR
-
 # - "$GOPATH/bin/goveralls -service=travis-ci"
 deploy:
   provider: releases
