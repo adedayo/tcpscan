@@ -7,6 +7,9 @@ environment:
 
 stack: go 1.10
 
+before_build:
+ - go get ./...
+
 before_test:
   - go vet ./...
 
