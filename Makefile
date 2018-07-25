@@ -5,7 +5,7 @@ else
 	VERSION_TAG := $(shell git describe --abbrev=0 --tags)
 	OUTFILE := "tcpscan_$(VERSION_TAG)_$(UNAME_S)_x86_64.tar.gz"
 	ifeq ($(UNAME_S),Linux)
-		BUILDFLAGS += -a -ldflags '-w -extldflags "-static -lpcap"'
+		BUILDFLAGS += -a -ldflags '-w -extldflags "-static"'
 	endif
 	ifeq ($(UNAME_S),Darwin)
 		BUILDFLAGS += -a
