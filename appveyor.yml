@@ -1,4 +1,4 @@
-build: off
+build: on
 
 clone_folder: c:\gopath\src\github.com\adedayo\tcpscan
 
