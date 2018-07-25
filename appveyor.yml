@@ -1,3 +1,4 @@
+version: '{tag}'
 image:
 - Visual Studio 2017
 build: on
@@ -11,16 +12,35 @@ stack: go 1.10
 
 platform: x64
 
+
 install:
- - appveyor DownloadFile https://github.com/the-tcpdump-group/libpcap/archive/libpcap-1.9.0.zip
- - dir
- - 7z x libpcap-1.9.0.zip 
- - move libpcap-libpcap-1.9.0 libpcap
- - cd libpcap
- - cmake .
+  - cinst winflexbison
+  - win_flex --version
+  - win_bison --version
+  
+install:
+  - cinst winflexbison
+  - win_flex --version
+  - win_bison --version
+  - appveyor DownloadFile https://github.com/the-tcpdump-group/libpcap/archive/libpcap-1.9.0.zip
+  - dir
+  - 7z x libpcap-1.9.0.zip 
+  - move libpcap-libpcap-1.9.0 libpcap
+  - cd libpcap
+  - appveyor DownloadFile http://www.winpcap.org/install/bin/WpdPack_4_1_2.zip
+  - 7z x .\WpdPack_4_1_2.zip -oWin32
+  - cmake .
+
+build_script:
+  - type NUL >.devel
+  - md build
+  - cd build
+  - cmake -DCMAKE_PREFIX_PATH=..\Win32\WpdPack -G"Visual Studio 12 2013" ..
+  - msbuild -nologo -p:Configuration=Release pcap.sln
+
 
 before_build:
- - go get ./...
+  - go get ./...
 
 # before_test:
 #   - go vet ./...
