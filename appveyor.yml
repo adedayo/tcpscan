@@ -33,11 +33,10 @@ build_script:
   - cmake -DCMAKE_PREFIX_PATH=..\Win32\WpdPack -G"Visual Studio 12 2013" ..
   - msbuild -nologo -p:Configuration=Release pcap.sln
   - cd ..
-  - go build cmd\tcpscan
 
 
 before_build:
-  # - go get ./...
+  - go get ./...
   - go build github.com\adedayo\tcpscan\cmd\tcpscan
 
 # before_test:
