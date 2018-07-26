@@ -3,10 +3,10 @@ image:
 - Visual Studio 2017
 build: on
 
-clone_folder: c:\gopath\src\github.com\adedayo\tcpscan
+clone_folder: c:\go\src\github.com\adedayo\tcpscan
 
 environment:
-  GOPATH: c:\gopath
+  GOPATH: c:\go
 
 stack: go 1.10
 
@@ -33,12 +33,12 @@ build_script:
   - cmake -DCMAKE_PREFIX_PATH=..\Win32\WpdPack -G"Visual Studio 12 2013" ..
   - msbuild -nologo -p:Configuration=Release pcap.sln
   - cd ..
-  - go build cmd/tcpscan
+  - go build cmd\tcpscan
 
 
 before_build:
   # - go get ./...
-  - go build cmd/tcpscan
+  - go build github.com\adedayo\tcpscan\cmd\tcpscan
 
 # before_test:
 #   - go vet ./...
