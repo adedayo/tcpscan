@@ -23,7 +23,7 @@ install:
   - cd libpcap
   - appveyor DownloadFile http://www.winpcap.org/install/bin/WpdPack_4_1_2.zip
   - 7z x .\WpdPack_4_1_2.zip -oWin32
-  - cmake .
+  # - cmake .
 
 build_script:
   - type NUL >.devel
@@ -31,6 +31,7 @@ build_script:
   - cd build
   - cmake -DCMAKE_PREFIX_PATH=..\Win32\WpdPack -G"Visual Studio 12 2013" ..
   - msbuild -nologo -p:Configuration=Release pcap.sln
+  - go build cmd/tcpscan
 
 
 before_build:
