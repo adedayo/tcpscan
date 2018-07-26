@@ -6,8 +6,15 @@ build: on
 clone_folder: c:\gopath\src\github.com\adedayo\tcpscan
 
 environment:
-  GOPATH: c:\gopath
-  CC: gcc.exe
+    global:
+      GOPATH: C:\gopath
+      CC: gcc.exe
+    matrix:
+      - GETH_ARCH: amd64
+        MSYS2_ARCH: x86_64
+        MSYS2_BITS: 64
+        MSYSTEM: MINGW64
+        PATH: C:\msys64\mingw64\bin\;C:\Program Files (x86)\NSIS\;%PATH%
 
 stack: go 1.10
 
