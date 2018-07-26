@@ -1,4 +1,4 @@
-version: '{tag}'
+version: '{build}'
 image:
 - Visual Studio 2017
 build: on
