@@ -44,11 +44,13 @@ build_script:
   - cmake -DCMAKE_PREFIX_PATH=..\libpcap -G"Visual Studio 12 2013" ..
   - msbuild -nologo -p:Configuration=Release pcap.sln
   - cd ..
-
-
-before_build:
   - go get ./...
   - go build github.com\adedayo\tcpscan\cmd\tcpscan
+
+
+# before_build:
+#   - go get ./...
+#   - go build github.com\adedayo\tcpscan\cmd\tcpscan
 
 # before_test:
 #   - go vet ./...
