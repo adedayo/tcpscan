@@ -1,4 +1,4 @@
-version: '{build}'
+version: '{branch}.{build}'
 image:
 - Visual Studio 2017
 build: on
@@ -7,14 +7,15 @@ clone_folder: c:\gopath\src\github.com\adedayo\tcpscan
 
 environment:
   GOPATH: c:\gopath
+  CC: gcc.exe
 
 stack: go 1.10
 
 platform: x64
 
 install:
+  - gcc --version
   - cinst winflexbison
-  - cinst gcc
   - win_flex --version
   - win_bison --version
   - appveyor DownloadFile https://github.com/the-tcpdump-group/libpcap/archive/libpcap-1.9.0.zip
