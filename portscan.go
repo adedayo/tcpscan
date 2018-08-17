@@ -10,6 +10,7 @@ import (
 	"github.com/google/gopacket/pcap"
 	"net"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -57,7 +58,18 @@ var (
 //ScanCIDR scans for open TCP ports in IP addresses within a CIDR range
 func ScanCIDR(cidrAddresses ...string) <-chan PortACK {
 	out := make(chan PortACK)
+	// cc := 0
+	// for _, x := range cidrAddresses {
+	// 	t := len(cidr.Expand(x))
+	// 	cc += t
+	// 	println(t, cc)
+	// }
+	// return nil
 	go func() {
+		// defer func() {
+		// 	println("Closing Out")
+		// 	close(out)
+		// }()
 		//get the network interface to use for scanning: eth0, en0 etc.
 		dev, netIface, err := getPreferredDevice()
 		bailout(err)
@@ -66,6 +78,7 @@ func ScanCIDR(cidrAddresses ...string) <-chan PortACK {
 		src := iface.IP
 		routerHW, err := determineRouterHardwareAddress()
 		bailout(err)
+		stoppers := []<-chan bool{}
 		ipCount := 1
 		for _, cidrX := range cidrAddresses {
 			ips := cidr.Expand(cidrX)
@@ -73,20 +86,18 @@ func ScanCIDR(cidrAddresses ...string) <-chan PortACK {
 			//restrict filtering to the specified CIDR IPs and listen for inbound ACK packets
 			filter := fmt.Sprintf(`net %s and not src host %s`, cidrX, src.String())
 			handle := getHandle(filter)
-			defer handle.Close()
+			// defer handle.Close()
 			stopper := make(chan bool)
-
+			stoppers = append(stoppers, stopper)
 			go listenForACKPackets(stopper, out, handle)
 
-			//Number of SYN packets to send per port (make this a parameter)
-			count := 1
+			count := 1 //Number of SYN packets to send per port (make this a parameter)
 			//Send SYN packets asynchronously
 			go func() { // run the scans in parallel
 				stopPort := 65535
 				sourcePort := 50000
 				for _, dstPort := range knownPorts {
 					for _, dstIP := range ips {
-
 						dst := net.ParseIP(dstIP)
 						// Send a specified number of SYN packets
 						for i := 0; i < count; i++ {
@@ -103,8 +114,48 @@ func ScanCIDR(cidrAddresses ...string) <-chan PortACK {
 		}
 		//wait for a factor of the total number of IPs and ports
 		delay := time.Duration(ipCount*len(knownPorts)/50) * time.Millisecond
+		// println("About to delay ", delay.String())
 		time.Sleep(delay)
+		counter := 0
+		for _ = range merge(stoppers...) {
+			counter++
+			// println(cc, ipCount, counter, n)
+		}
+		close(out)
+		// println("finished delay")
+		// counter := 1
+		// for _, st := range stoppers {
+		// 	select {
+		// 	case <-st:
+		// 		println("A stopper is stopping")
+		// 	}
+		// 	// println("stopp2d count ", len(stoppers))
+		// 	// counter++
+		// }
+		// time.Sleep(2000 * time.Millisecond)
 
+	}()
+	return out
+}
+
+func merge(stoppers ...<-chan bool) <-chan bool {
+	var wg sync.WaitGroup
+	out := make(chan bool)
+
+	output := func(c <-chan bool) {
+		for n := range c {
+			out <- n
+		}
+		wg.Done()
+	}
+
+	wg.Add(len(stoppers))
+	for _, c := range stoppers {
+		go output(c)
+	}
+
+	go func() {
+		wg.Wait()
 		close(out)
 	}()
 	return out
@@ -171,7 +222,6 @@ func determineRouterHardwareAddress() (net.HardwareAddr, error) {
 	case <-time.After(5 * time.Second):
 		return nil, errors.New("Timeout error: could not determine the router hardware address in time")
 	}
-
 }
 
 //listenForEthernetPackets collects packets on the network that meet port scan specifications
@@ -198,20 +248,29 @@ func listenForEthernetPackets(handle *pcap.Handle) <-chan net.HardwareAddr {
 }
 
 //listenForACKPackets collects packets on the network that meet port scan specifications
-func listenForACKPackets(done <-chan bool, output chan<- PortACK, handle *pcap.Handle) {
+func listenForACKPackets(done chan bool, output chan<- PortACK, handle *pcap.Handle) {
 
+	// defer exiting("listen for packets")
 	var eth layers.Ethernet
 	var ip layers.IPv4
 	var tcp layers.TCP
 	parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &ip, &tcp)
 	decodedLayers := []gopacket.LayerType{}
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
-
-	for packet := range packetSource.Packets() {
-		select {
-		case <-done:
-			return
-		default:
+	go func() {
+		for packet := range packetSource.Packets() {
+			// println("Packet", packet.String())
+			// select {
+			// case <-time.After(3 * time.Second):
+			// 	println("Expired")
+			// 	handle.Close()
+			// 	return
+			// case <-done:
+			// 	println("DONE")
+			// 	handle.Close()
+			// 	return
+			// default:
+			// println("default")
 			parser.DecodeLayers(packet.Data(), &decodedLayers)
 			for _, lyr := range decodedLayers {
 				//Look for TCP ACK
@@ -227,23 +286,54 @@ func listenForACKPackets(done <-chan bool, output chan<- PortACK, handle *pcap.H
 					}
 				}
 			}
+			// }
 		}
+		// close(output)
+	}()
+	select {
+	case <-time.After(2 * time.Second):
+		println("Expired")
+		handle.Close()
+		done <- true
+		close(done)
+		return
 	}
+
 }
+
+// func exiting(loc string) {
+// 	println("Exiting location", loc)
+// }
 
 func bailout(err error) {
 	if err != nil {
-		panic(err.Error())
+		// panic(err.Error())
+		println("Error: ", err.Error())
 	}
 }
 
+// func stringify(adds []pcap.InterfaceAddress) (result string) {
+// 	for _, add := range adds {
+// 		result += " " + add.IP.String()
+// 	}
+// 	return
+// }
 func getPreferredDevice() (pcap.Interface, net.Interface, error) {
 	devices, err := pcap.FindAllDevs()
 	if err != nil {
 		return pcap.Interface{}, net.Interface{}, err
 	}
 
+	// for _, dev := range devices {
+	// 	iface, _ := net.InterfaceByName(dev.Name)
+	// 	adds, _ := iface.Addrs()
+	// 	println("device ", dev.Name, stringify(dev.Addresses), iface.HardwareAddr.String())
+	// 	if len(adds) > 0 {
+	// 		println(adds[0].String())
+	// 	}
+	// }
 	for _, dev := range devices {
+		// println("device ", dev.Name)
 		if dev.Name == "en0" || dev.Name == "eth0" {
 
 			if err != nil {
