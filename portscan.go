@@ -4,14 +4,15 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"github.com/adedayo/cidr"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcap"
 	"net"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/adedayo/cidr"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcap"
 )
 
 var (
@@ -58,18 +59,8 @@ var (
 //ScanCIDR scans for open TCP ports in IP addresses within a CIDR range
 func ScanCIDR(cidrAddresses ...string) <-chan PortACK {
 	out := make(chan PortACK)
-	// cc := 0
-	// for _, x := range cidrAddresses {
-	// 	t := len(cidr.Expand(x))
-	// 	cc += t
-	// 	println(t, cc)
-	// }
-	// return nil
 	go func() {
-		// defer func() {
-		// 	println("Closing Out")
-		// 	close(out)
-		// }()
+		defer close(out)
 		//get the network interface to use for scanning: eth0, en0 etc.
 		dev, netIface, err := getPreferredDevice()
 		bailout(err)
@@ -86,11 +77,9 @@ func ScanCIDR(cidrAddresses ...string) <-chan PortACK {
 			//restrict filtering to the specified CIDR IPs and listen for inbound ACK packets
 			filter := fmt.Sprintf(`net %s and not src host %s`, cidrX, src.String())
 			handle := getHandle(filter)
-			// defer handle.Close()
-			stopper := make(chan bool)
+			timeout := 5 * time.Second
+			stopper := listenForACKPackets(filter, timeout, out)
 			stoppers = append(stoppers, stopper)
-			go listenForACKPackets(stopper, out, handle)
-
 			count := 1 //Number of SYN packets to send per port (make this a parameter)
 			//Send SYN packets asynchronously
 			go func() { // run the scans in parallel
@@ -112,28 +101,13 @@ func ScanCIDR(cidrAddresses ...string) <-chan PortACK {
 				}
 			}()
 		}
-		//wait for a factor of the total number of IPs and ports
+		// wait for a factor of the total number of IPs and ports
 		delay := time.Duration(ipCount*len(knownPorts)/50) * time.Millisecond
-		// println("About to delay ", delay.String())
 		time.Sleep(delay)
-		counter := 0
-		for _ = range merge(stoppers...) {
-			counter++
-			// println(cc, ipCount, counter, n)
-		}
-		close(out)
-		// println("finished delay")
-		// counter := 1
-		// for _, st := range stoppers {
-		// 	select {
-		// 	case <-st:
-		// 		println("A stopper is stopping")
-		// 	}
-		// 	// println("stopp2d count ", len(stoppers))
-		// 	// counter++
-		// }
-		// time.Sleep(2000 * time.Millisecond)
 
+		for range merge(stoppers...) {
+			//wait for the completion or timeouts
+		}
 	}()
 	return out
 }
@@ -141,19 +115,16 @@ func ScanCIDR(cidrAddresses ...string) <-chan PortACK {
 func merge(stoppers ...<-chan bool) <-chan bool {
 	var wg sync.WaitGroup
 	out := make(chan bool)
-
 	output := func(c <-chan bool) {
 		for n := range c {
 			out <- n
 		}
 		wg.Done()
 	}
-
 	wg.Add(len(stoppers))
 	for _, c := range stoppers {
 		go output(c)
 	}
-
 	go func() {
 		wg.Wait()
 		close(out)
@@ -198,7 +169,6 @@ func sendSYNPacket(srcMAC, dstMAC net.HardwareAddr, src, dst net.IP, srcPort, ds
 	}
 
 	tcp.SetNetworkLayerForChecksum(&ip4)
-	// ipFlow := gopacket.NewFlow(layers.EndpointIPv4, dst, src)
 	buf := gopacket.NewSerializeBuffer()
 	if err := gopacket.SerializeLayers(buf, options, &eth, &ip4, &tcp); err != nil {
 		return err
@@ -248,29 +218,17 @@ func listenForEthernetPackets(handle *pcap.Handle) <-chan net.HardwareAddr {
 }
 
 //listenForACKPackets collects packets on the network that meet port scan specifications
-func listenForACKPackets(done chan bool, output chan<- PortACK, handle *pcap.Handle) {
-
-	// defer exiting("listen for packets")
+func listenForACKPackets(filter string, timeout time.Duration, output chan<- PortACK) chan bool {
+	done := make(chan bool)
 	var eth layers.Ethernet
 	var ip layers.IPv4
 	var tcp layers.TCP
 	parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &ip, &tcp)
 	decodedLayers := []gopacket.LayerType{}
+	handle := getTimedHandle(filter, timeout)
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	go func() {
 		for packet := range packetSource.Packets() {
-			// println("Packet", packet.String())
-			// select {
-			// case <-time.After(3 * time.Second):
-			// 	println("Expired")
-			// 	handle.Close()
-			// 	return
-			// case <-done:
-			// 	println("DONE")
-			// 	handle.Close()
-			// 	return
-			// default:
-			// println("default")
 			parser.DecodeLayers(packet.Data(), &decodedLayers)
 			for _, lyr := range decodedLayers {
 				//Look for TCP ACK
@@ -286,56 +244,34 @@ func listenForACKPackets(done chan bool, output chan<- PortACK, handle *pcap.Han
 					}
 				}
 			}
-			// }
 		}
-		// close(output)
-	}()
-	select {
-	case <-time.After(2 * time.Second):
-		println("Expired")
-		handle.Close()
-		done <- true
 		close(done)
-		return
-	}
+	}()
 
+	//stop after timeout
+	go func() {
+		select {
+		case <-time.After(timeout):
+			handle.Close()
+		}
+	}()
+	return done
 }
-
-// func exiting(loc string) {
-// 	println("Exiting location", loc)
-// }
 
 func bailout(err error) {
 	if err != nil {
-		// panic(err.Error())
-		println("Error: ", err.Error())
+		panic(err.Error())
 	}
 }
 
-// func stringify(adds []pcap.InterfaceAddress) (result string) {
-// 	for _, add := range adds {
-// 		result += " " + add.IP.String()
-// 	}
-// 	return
-// }
 func getPreferredDevice() (pcap.Interface, net.Interface, error) {
 	devices, err := pcap.FindAllDevs()
 	if err != nil {
 		return pcap.Interface{}, net.Interface{}, err
 	}
 
-	// for _, dev := range devices {
-	// 	iface, _ := net.InterfaceByName(dev.Name)
-	// 	adds, _ := iface.Addrs()
-	// 	println("device ", dev.Name, stringify(dev.Addresses), iface.HardwareAddr.String())
-	// 	if len(adds) > 0 {
-	// 		println(adds[0].String())
-	// 	}
-	// }
 	for _, dev := range devices {
-		// println("device ", dev.Name)
 		if dev.Name == "en0" || dev.Name == "eth0" {
-
 			if err != nil {
 				return dev, net.Interface{}, err
 			}
@@ -363,7 +299,6 @@ func getPreferredDevice() (pcap.Interface, net.Interface, error) {
 }
 
 func getIPv4InterfaceAddress(iface pcap.Interface) (pcap.InterfaceAddress, error) {
-
 	for _, add := range iface.Addresses {
 		if strings.Contains(add.IP.String(), ".") {
 			return add, nil

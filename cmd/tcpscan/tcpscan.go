@@ -2,14 +2,15 @@ package main
 
 import (
 	"fmt"
-	"github.com/adedayo/tcpscan"
-	"github.com/urfave/cli"
 	"log"
 	"net"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/adedayo/tcpscan"
+	"github.com/urfave/cli"
 )
 
 var (

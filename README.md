@@ -66,6 +66,17 @@ brew tap adedayo/tap
 brew install tcpscan
 ``` 
 
+#### Some issues in OS X
+You may encounter errors such as 
+```bash
+panic: en0: You don't have permission to capture on that device ((cannot open BPF device) /dev/bpf0: Permission denied)
+```
+Fix the permission problem by issuing the following command:
+
+```bash
+sudo chown $USER:admin /dev/bpf?
+```
+
 ### Scanning CIDR ranges
 
 ```bash

@@ -1,6 +1,6 @@
 language: go
 go:
-- 1.10.x
+- 1.11.x
 gobuild_args: -a -tags pcap -ldflags '-w -extldflags "-static"'
 before_install:
 - sudo apt-get install git cmake flex bison
