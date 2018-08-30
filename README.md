@@ -67,7 +67,19 @@ brew tap adedayo/tap
 brew install tcpscan
 ``` 
 
-#### Some issues in macOS
+### Scanning CIDR ranges
+
+```bash
+tcpscan 192.168.2.5/30 10.11.12.13/31
+```
+
+For JSON-formatted output simply add the `--json` or `-j` flag:
+
+```bash
+tcpscan --json 192.168.2.5/30 10.11.12.13/31
+```
+
+## Some issues on macOS
 You may encounter errors such as 
 ```bash
 panic: en0: You don't have permission to capture on that device ((cannot open BPF device) /dev/bpf0: Permission denied)
@@ -93,18 +105,6 @@ launchctl load -w /Library/LaunchDaemons/com.github.adedayo.libpcap.bpf-helper.p
 ```
 
 You should be good to go! This works across reboots.
-
-### Scanning CIDR ranges
-
-```bash
-tcpscan 192.168.2.5/30 10.11.12.13/31
-```
-
-For JSON-formatted output simply add the `--json` or `-j` flag:
-
-```bash
-tcpscan --json 192.168.2.5/30 10.11.12.13/31
-```
 
 ## License
 BSD 3-Clause License
