@@ -84,20 +84,12 @@ You may encounter errors such as
 ```bash
 panic: en0: You don't have permission to capture on that device ((cannot open BPF device) /dev/bpf0: Permission denied)
 ```
-Fix the permission problem permanently by using the "Wireshark" approach of pre-allocating _/dev/bpf*_, and changing their permissions so that the _admin_ group can read from and write packets to the devices. Follow the steps below:
-
+Fix the permission problem permanently by using the "Wireshark" approach of pre-allocating _/dev/bpf*_, and changing their permissions so that the _admin_ group can read from and write packets to the devices. I have provided the _fix-bpf-permissions.sh_ script to simplify the steps, you can run it as shown below. It will ask for your password for the privileged part of the script, but read the script to satisfy yourself that you trust what it is doing! You care about security, right?
 
 ```bash
-curl -O https://raw.githubusercontent.com/adedayo/tcpscan/master/com.github.adedayo.libpcap.bpf-helper.sh
-curl -O https://raw.githubusercontent.com/adedayo/tcpscan/master/com.github.adedayo.libpcap.bpf-helper.plist
-
-sudo su
-mv com.github.adedayo.libpcap.bpf-helper.sh /Library/PrivilegedHelperTools/
-mv com.github.adedayo.libpcap.bpf-helper.plist /Library/LaunchDaemons/
-chown root:wheel /Library/PrivilegedHelperTools/com.github.adedayo.libpcap.bpf-helper.sh
-chown root:wheel /Library/LaunchDaemons/com.github.adedayo.libpcap.bpf-helper.plist
-chmod 755 /Library/PrivilegedHelperTools/com.github.adedayo.libpcap.bpf-helper.sh
-launchctl load -w /Library/LaunchDaemons/com.github.adedayo.libpcap.bpf-helper.plist
+curl -O https://raw.githubusercontent.com/adedayo/tcpscan/master/fix-bpf-permissions.sh
+chmod +x fix-bpf-permissions.sh
+./fix-bpf-permissions.sh  
 ```
 
 You should be good to go! This works across reboots. Note that this is a common problem for tools such as Wireshark, TCPDump etc. that need to read from or write to /dev/bpf*. This solution should fix the problem for all of them - the idea was actually stolen from Wireshark with some modifications :-).
