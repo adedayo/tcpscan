@@ -24,8 +24,8 @@ import
 )
 
 func main() {
-	ipRange :="8.8.8.8/32"
-	result := portscan.ScanCIDR(ipRange)
+	cidr := "8.8.8.8/32"
+	result := portscan.ScanCIDR(cidr)
 	for ack := range result {
          fmt.Printf("%s:\tPort %s(%s) is %s\n", ack.Host, ack.Port, ack.GetServiceName(), status(ack))
     }
