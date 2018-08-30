@@ -79,7 +79,7 @@ For JSON-formatted output simply add the `--json` or `-j` flag:
 tcpscan --json 192.168.2.5/30 10.11.12.13/31
 ```
 
-## Some issues on macOS
+## An issue on macOS
 You may encounter errors such as 
 ```bash
 panic: en0: You don't have permission to capture on that device ((cannot open BPF device) /dev/bpf0: Permission denied)
@@ -100,7 +100,7 @@ chmod 755 /Library/PrivilegedHelperTools/com.github.adedayo.libpcap.bpf-helper.s
 launchctl load -w /Library/LaunchDaemons/com.github.adedayo.libpcap.bpf-helper.plist
 ```
 
-You should be good to go! This works across reboots.
+You should be good to go! This works across reboots. Note that this is a common problem for tools such as Wireshark, TCPDump etc. that need to read from or write to /dev/bpf*. This solution should fix the problem for all of them - the idea was actually stolen from Wireshark with some modifications :-).
 
 ## License
 BSD 3-Clause License
