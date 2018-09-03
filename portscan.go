@@ -16,6 +16,8 @@ import (
 )
 
 var (
+	timeout = 5 * time.Second
+
 	options = gopacket.SerializeOptions{
 		FixLengths:       true,
 		ComputeChecksums: true,
@@ -77,7 +79,6 @@ func ScanCIDR(cidrAddresses ...string) <-chan PortACK {
 			//restrict filtering to the specified CIDR IPs and listen for inbound ACK packets
 			filter := fmt.Sprintf(`net %s and not src host %s`, cidrX, src.String())
 			handle := getHandle(filter)
-			timeout := 5 * time.Second
 			stopper := listenForACKPackets(filter, timeout, out)
 			stoppers = append(stoppers, stopper)
 			count := 1 //Number of SYN packets to send per port (make this a parameter)
