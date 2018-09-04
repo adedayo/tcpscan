@@ -16,8 +16,6 @@ import (
 )
 
 var (
-	timeout = 5 * time.Second
-
 	options = gopacket.SerializeOptions{
 		FixLengths:       true,
 		ComputeChecksums: true,
@@ -59,7 +57,7 @@ var (
 )
 
 //ScanCIDR scans for open TCP ports in IP addresses within a CIDR range
-func ScanCIDR(cidrAddresses ...string) <-chan PortACK {
+func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 	out := make(chan PortACK)
 	go func() {
 		defer close(out)
@@ -73,6 +71,7 @@ func ScanCIDR(cidrAddresses ...string) <-chan PortACK {
 		bailout(err)
 		stoppers := []<-chan bool{}
 		ipCount := 1
+		timeout := time.Duration(config.Timeout) * time.Second
 		for _, cidrX := range cidrAddresses {
 			ips := cidr.Expand(cidrX)
 			ipCount += len(ips)

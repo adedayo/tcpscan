@@ -10,6 +10,12 @@ import (
 	"strings"
 )
 
+//ScanConfig describes details of how the port scan should be carried out
+type ScanConfig struct {
+	//How long to wait listening for TCP ACK/RST responses
+	Timeout int
+}
+
 //PortACK describes a port with an ACK after a TCP SYN request
 type PortACK struct {
 	Host string

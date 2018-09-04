@@ -25,7 +25,10 @@ import
 
 func main() {
 	cidr := "8.8.8.8/32"
-	result := portscan.ScanCIDR(cidr)
+	config := portscan.ScanConfig {
+		Timeout: 5,
+	}
+	result := portscan.ScanCIDR(config, cidr)
 	for ack := range result {
          fmt.Printf("%s:\tPort %s(%s) is %s\n", ack.Host, ack.Port, ack.GetServiceName(), status(ack))
     }
@@ -78,6 +81,13 @@ For JSON-formatted output simply add the `--json` or `-j` flag:
 ```bash
 tcpscan --json 192.168.2.5/30 10.11.12.13/31
 ```
+Depending on the fidelity of the network being scanned or the size of CIDR ranges, it may be expedient to adjust the scan timeout accordingly with the `--timeout` or `-t` flag, which indicates the number of seconds to wait for ACK or RST responses as follows:
+
+```bash
+tcpscan --json --timeout 5 192.168.2.5/30 10.11.12.13/31
+```
+
+Note that scans generally run faster with shorter timeouts, but you may be sacrificing accuracy on slow networks or for large CIDR ranges.
 
 ## An issue on macOS
 You may encounter errors such as 

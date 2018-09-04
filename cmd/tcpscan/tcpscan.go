@@ -37,6 +37,11 @@ tcpscan 8.8.8.8/32 10.10.10.1/30
 			Name:  "json, j",
 			Usage: "generate JSON output",
 		},
+		&cli.IntFlag{
+			Name:  "timeout, t",
+			Usage: "timeout (in seconds) to adjust how much we are willing to wait for servers to come back with responses. Smaller timeout sacrifices accuracy for speed",
+			Value: 5,
+		},
 	}
 	app.EnableBashCompletion = true
 
@@ -67,7 +72,10 @@ func process(c *cli.Context) error {
 	args = append(args, c.Args().First())
 	args = append(args, c.Args().Tail()...)
 	scan := make(map[string]portscan.PortACK)
-	for ack := range portscan.ScanCIDR(args...) {
+	config := portscan.ScanConfig{
+		Timeout: c.Int("timeout"),
+	}
+	for ack := range portscan.ScanCIDR(config, args...) {
 		key := ack.Host + ack.Port
 		if _, present := scan[key]; !present {
 			scan[key] = ack
