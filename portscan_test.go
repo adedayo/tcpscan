@@ -7,7 +7,7 @@ import (
 func Test(t *testing.T) {
 	ipRange := "8.8.8.8/32"
 	scan := make(map[string]PortACK)
-	result := ScanCIDR(ipRange)
+	result := ScanCIDR(ScanConfig{Timeout: 10}, ipRange)
 	for ack := range result {
 		key := ack.Host + ack.Port
 		if _, present := scan[key]; !present {
