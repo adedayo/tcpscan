@@ -2,6 +2,7 @@ package portscan
 
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"net"
@@ -56,19 +57,33 @@ var (
 	}
 )
 
+type routeFinder struct {
+	IsPPP           bool
+	SrcHardwareAddr net.HardwareAddr
+	DstHardwareAddr net.HardwareAddr
+}
+
 //ScanCIDR scans for open TCP ports in IP addresses within a CIDR range
 func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 	out := make(chan PortACK)
 	go func() {
 		defer close(out)
-		//get the network interface to use for scanning: eth0, en0 etc.
+		//get the network interface to use for scanning: ppp0, eth0, en0 etc.
 		dev, netIface, err := getPreferredDevice()
 		bailout(err)
+		route := routeFinder{}
 		iface, err := getIPv4InterfaceAddress(dev)
 		bailout(err)
 		src := iface.IP
-		routerHW, err := determineRouterHardwareAddress()
-		bailout(err)
+		if strings.HasPrefix(dev.Name, "ppp") {
+			route.IsPPP = true
+		} else {
+			routerHW, err := determineRouterHardwareAddress()
+			bailout(err)
+			route.SrcHardwareAddr = netIface.HardwareAddr
+			route.DstHardwareAddr = routerHW
+		}
+
 		stoppers := []<-chan bool{}
 		ipCount := 1
 		timeout := time.Duration(config.Timeout) * time.Second
@@ -76,9 +91,9 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 			ips := cidr.Expand(cidrX)
 			ipCount += len(ips)
 			//restrict filtering to the specified CIDR IPs and listen for inbound ACK packets
-			filter := fmt.Sprintf(`net %s and not src host %s`, cidrX, src.String())
-			handle := getHandle(filter)
-			stopper := listenForACKPackets(filter, timeout, out)
+			filter := fmt.Sprintf(`net %s and not src host %s`, getNet(cidrX), src.String())
+			handle := getTimedHandle(filter, timeout)
+			stopper := listenForACKPackets(filter, route, timeout, out)
 			stoppers = append(stoppers, stopper)
 			count := 1 //Number of SYN packets to send per port (make this a parameter)
 			//Send SYN packets asynchronously
@@ -90,7 +105,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 						dst := net.ParseIP(dstIP)
 						// Send a specified number of SYN packets
 						for i := 0; i < count; i++ {
-							err := sendSYNPacket(netIface.HardwareAddr, routerHW, src, dst, sourcePort, dstPort, handle)
+							err = sendSYNPacket(src, dst, sourcePort, dstPort, route, handle)
 							bailout(err)
 							sourcePort++
 							if sourcePort > stopPort {
@@ -110,6 +125,20 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 		}
 	}()
 	return out
+}
+
+//allow domains to be used in CIDRs
+func getNet(cidrX string) (result string) {
+	adds := strings.Split(cidrX, "/")
+	rng := ""
+	if strings.Contains(cidrX, "/") {
+		rng = "/" + adds[1]
+	}
+	ips, err := net.LookupIP(adds[0])
+	if err != nil {
+		return
+	}
+	return ips[0].String() + rng
 }
 
 func merge(stoppers ...<-chan bool) <-chan bool {
@@ -132,11 +161,21 @@ func merge(stoppers ...<-chan bool) <-chan bool {
 	return out
 }
 
-func sendSYNPacket(srcMAC, dstMAC net.HardwareAddr, src, dst net.IP, srcPort, dstPrt int, handle *pcap.Handle) error {
-	eth := layers.Ethernet{
-		SrcMAC:       srcMAC,
-		DstMAC:       dstMAC,
-		EthernetType: layers.EthernetTypeIPv4,
+func sendSYNPacket(src, dst net.IP, srcPort, dstPrt int, route routeFinder, handle *pcap.Handle) error {
+	var firstLayer gopacket.SerializableLayer
+	if route.IsPPP {
+		ppp := layers.PPP{
+			PPPType: layers.PPPTypeIPv4,
+		}
+		ppp.Contents = []byte{0xff, 0x03}
+		firstLayer = &ppp
+	} else {
+		eth := layers.Ethernet{
+			SrcMAC:       route.SrcHardwareAddr,
+			DstMAC:       route.DstHardwareAddr,
+			EthernetType: layers.EthernetTypeIPv4,
+		}
+		firstLayer = &eth
 	}
 	ip4 := layers.IPv4{
 		SrcIP:      src,
@@ -170,7 +209,7 @@ func sendSYNPacket(srcMAC, dstMAC net.HardwareAddr, src, dst net.IP, srcPort, ds
 
 	tcp.SetNetworkLayerForChecksum(&ip4)
 	buf := gopacket.NewSerializeBuffer()
-	if err := gopacket.SerializeLayers(buf, options, &eth, &ip4, &tcp); err != nil {
+	if err := gopacket.SerializeLayers(buf, options, firstLayer, &ip4, &tcp); err != nil {
 		return err
 	}
 	return handle.WritePacketData(buf.Bytes())
@@ -184,7 +223,6 @@ func determineRouterHardwareAddress() (net.HardwareAddr, error) {
 	bailout(err)
 	handle := getTimedHandle(fmt.Sprintf("host %s and ether dst %s", google, iface.HardwareAddr.String()), 5*time.Second)
 	out := listenForEthernetPackets(handle)
-
 	_, _ = net.Dial("tcp", fmt.Sprintf("%s:443", google))
 	select {
 	case hwAddress := <-out:
@@ -217,13 +255,47 @@ func listenForEthernetPackets(handle *pcap.Handle) <-chan net.HardwareAddr {
 	return output
 }
 
+// MyPPP is layers.PPP with CanDecode and other decoding operations implemented
+type MyPPP layers.PPP
+
+//CanDecode indicates that we can decode PPP packets
+func (ppp *MyPPP) CanDecode() gopacket.LayerClass {
+	return layers.LayerTypePPP
+}
+
+//LayerType -
+func (ppp *MyPPP) LayerType() gopacket.LayerType { return layers.LayerTypePPP }
+
+//DecodeFromBytes as name suggest
+func (ppp *MyPPP) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	if len(data) > 2 && data[0] == 0xff && data[1] == 0x03 {
+		ppp.PPPType = layers.PPPType(binary.BigEndian.Uint16(data[2:4]))
+		ppp.Contents = data
+		ppp.Payload = data[4:]
+		return nil
+	}
+	return errors.New("Not a PPP packet")
+}
+
+//NextLayerType gets type
+func (ppp *MyPPP) NextLayerType() gopacket.LayerType {
+	return layers.LayerTypeIPv4
+}
+
 //listenForACKPackets collects packets on the network that meet port scan specifications
-func listenForACKPackets(filter string, timeout time.Duration, output chan<- PortACK) chan bool {
+func listenForACKPackets(filter string, route routeFinder, timeout time.Duration, output chan<- PortACK) chan bool {
 	done := make(chan bool)
-	var eth layers.Ethernet
 	var ip layers.IPv4
 	var tcp layers.TCP
-	parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &ip, &tcp)
+	var parser *gopacket.DecodingLayerParser
+	if route.IsPPP {
+		var ppp MyPPP
+		parser = gopacket.NewDecodingLayerParser(layers.LayerTypePPP, &ppp, &ip, &tcp)
+	} else {
+		var eth layers.Ethernet
+		parser = gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &ip, &tcp)
+	}
+
 	decodedLayers := []gopacket.LayerType{}
 	handle := getTimedHandle(filter, timeout)
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
@@ -269,33 +341,37 @@ func getPreferredDevice() (pcap.Interface, net.Interface, error) {
 	if err != nil {
 		return pcap.Interface{}, net.Interface{}, err
 	}
-
-	for _, dev := range devices {
-		if dev.Name == "en0" || dev.Name == "eth0" {
-			if err != nil {
-				return dev, net.Interface{}, err
+	for i := 0; i < 5; i++ {
+		//search in this order: VPN, then non-VPN; from lower interface index 0 up till 4
+		//i.e ppp0, en0, eth0, ppp1, en1, eth1, ...
+		for _, iface := range []string{"ppp", "en", "eth"} {
+			for _, dev := range devices {
+				if dev.Name == fmt.Sprintf("%s%d", iface, i) {
+					ifx, err := getRoutableInterface(dev)
+					return dev, ifx, err
+				}
 			}
-			iface, err := net.InterfaceByName(dev.Name)
-			if err != nil {
-				return dev, net.Interface{}, err
-			}
-			return dev, *iface, err
-		}
-	}
-
-	//at this point no en0 or eth0 found. Attempt to use any first interface with a non-loopback IP :-S
-	for _, dev := range devices {
-		ip := dev.Addresses[0].IP
-		if !ip.IsLoopback() {
-			iface, err := net.InterfaceByName(dev.Name)
-			if err != nil {
-				return dev, net.Interface{}, err
-			}
-			return dev, *iface, err
 		}
 	}
 	// give up and bail out
 	return pcap.Interface{}, net.Interface{}, errors.New("Could not find a preferred interface with a routable IP")
+}
+
+func getRoutableInterface(dev pcap.Interface) (net.Interface, error) {
+	if strings.HasPrefix(dev.Name, "ppp") {
+		return net.Interface{}, nil
+	}
+
+	for _, add := range dev.Addresses {
+		if !add.IP.IsLoopback() && strings.Contains(add.IP.String(), ".") {
+			iface, err := net.InterfaceByName(dev.Name)
+			if err != nil {
+				return net.Interface{}, err
+			}
+			return *iface, nil
+		}
+	}
+	return net.Interface{}, errors.New("No routable interface")
 }
 
 func getIPv4InterfaceAddress(iface pcap.Interface) (pcap.InterfaceAddress, error) {
@@ -307,17 +383,9 @@ func getIPv4InterfaceAddress(iface pcap.Interface) (pcap.InterfaceAddress, error
 	return pcap.InterfaceAddress{}, errors.New("Could not find an interface with IPv4 address")
 }
 
-func getHandle(bpfFilter string) *pcap.Handle {
-	return getTimedHandle(bpfFilter, pcap.BlockForever)
-}
-
 func getTimedHandle(bpfFilter string, timeOut time.Duration) *pcap.Handle {
 	dev, _, err := getPreferredDevice()
 	bailout(err)
-	addresses := []string{}
-	for _, add := range dev.Addresses {
-		addresses = append(addresses, fmt.Sprintf("dst host %s", add.IP.String()))
-	}
 	handle, err := pcap.OpenLive(dev.Name, 65535, false, timeOut)
 	bailout(err)
 	handle.SetBPFFilter(bpfFilter)
