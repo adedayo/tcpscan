@@ -14,6 +14,8 @@ import (
 type ScanConfig struct {
 	//How long to wait listening for TCP ACK/RST responses
 	Timeout int
+	//If not empty, indicates which network interface to use, bypassing automated guessing
+	Interface string
 }
 
 //PortACK describes a port with an ACK after a TCP SYN request

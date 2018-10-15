@@ -20,7 +20,7 @@ func Test(t *testing.T) {
 }
 
 func TestGetRouterHW(t *testing.T) {
-	_, err := determineRouterHardwareAddress()
+	_, err := determineRouterHardwareAddress(ScanConfig{})
 	if err != nil {
 		t.Error(err.Error())
 	}

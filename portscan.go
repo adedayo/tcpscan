@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 	"sync"
@@ -69,7 +70,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 	go func() {
 		defer close(out)
 		//get the network interface to use for scanning: ppp0, eth0, en0 etc.
-		dev, netIface, err := getPreferredDevice()
+		dev, netIface, err := getPreferredDevice(config)
 		bailout(err)
 		route := routeFinder{}
 		iface, err := getIPv4InterfaceAddress(dev)
@@ -78,7 +79,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 		if strings.HasPrefix(dev.Name, "ppp") {
 			route.IsPPP = true
 		} else {
-			routerHW, err := determineRouterHardwareAddress()
+			routerHW, err := determineRouterHardwareAddress(config)
 			bailout(err)
 			route.SrcHardwareAddr = netIface.HardwareAddr
 			route.DstHardwareAddr = routerHW
@@ -92,17 +93,17 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 			ipCount += len(ips)
 			//restrict filtering to the specified CIDR IPs and listen for inbound ACK packets
 			filter := fmt.Sprintf(`net %s and not src host %s`, getNet(cidrX), src.String())
-			handle := getTimedHandle(filter, timeout)
-			stopper := listenForACKPackets(filter, route, timeout, out)
+			handle := getTimedHandle(filter, timeout, config)
+			stopper := listenForACKPackets(filter, route, timeout, out, config)
 			stoppers = append(stoppers, stopper)
 			count := 1 //Number of SYN packets to send per port (make this a parameter)
 			//Send SYN packets asynchronously
 			go func() { // run the scans in parallel
 				stopPort := 65535
 				sourcePort := 50000
-				for _, dstPort := range knownPorts {
-					for _, dstIP := range ips {
-						dst := net.ParseIP(dstIP)
+				for _, dstIP := range ips {
+					dst := net.ParseIP(dstIP)
+					for _, dstPort := range knownPorts {
 						// Send a specified number of SYN packets
 						for i := 0; i < count; i++ {
 							err = sendSYNPacket(src, dst, sourcePort, dstPort, route, handle)
@@ -130,7 +131,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 //allow domains to be used in CIDRs
 func getNet(cidrX string) (result string) {
 	adds := strings.Split(cidrX, "/")
-	rng := ""
+	rng := "/32"
 	if strings.Contains(cidrX, "/") {
 		rng = "/" + adds[1]
 	}
@@ -217,11 +218,11 @@ func sendSYNPacket(src, dst net.IP, srcPort, dstPrt int, route routeFinder, hand
 }
 
 //determineRouterHardwareAddress finds the router by looking at the ethernet frames that returns the TCP ACK handshake from "google"
-func determineRouterHardwareAddress() (net.HardwareAddr, error) {
+func determineRouterHardwareAddress(config ScanConfig) (net.HardwareAddr, error) {
 	google := "www.google.com"
-	_, iface, err := getPreferredDevice()
+	_, iface, err := getPreferredDevice(config)
 	bailout(err)
-	handle := getTimedHandle(fmt.Sprintf("host %s and ether dst %s", google, iface.HardwareAddr.String()), 5*time.Second)
+	handle := getTimedHandle(fmt.Sprintf("host %s and ether dst %s", google, iface.HardwareAddr.String()), 5*time.Second, config)
 	out := listenForEthernetPackets(handle)
 	_, _ = net.Dial("tcp", fmt.Sprintf("%s:443", google))
 	select {
@@ -283,7 +284,7 @@ func (ppp *MyPPP) NextLayerType() gopacket.LayerType {
 }
 
 //listenForACKPackets collects packets on the network that meet port scan specifications
-func listenForACKPackets(filter string, route routeFinder, timeout time.Duration, output chan<- PortACK) chan bool {
+func listenForACKPackets(filter string, route routeFinder, timeout time.Duration, output chan<- PortACK, config ScanConfig) chan bool {
 	done := make(chan bool)
 	var ip layers.IPv4
 	var tcp layers.TCP
@@ -297,10 +298,24 @@ func listenForACKPackets(filter string, route routeFinder, timeout time.Duration
 	}
 
 	decodedLayers := []gopacket.LayerType{}
-	handle := getTimedHandle(filter, timeout)
+	handle := getTimedHandle(filter, timeout, config)
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	go func() {
-		for packet := range packetSource.Packets() {
+		// for packet := range packetSource.Packets() {
+		for {
+			packet, err := packetSource.NextPacket()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				if err.Error() == pcap.NextErrorTimeoutExpired.Error() {
+					continue
+				} else {
+					//some other error, will be useful for debugging
+					// println(err.Error())
+				}
+			}
+
 			parser.DecodeLayers(packet.Data(), &decodedLayers)
 			for _, lyr := range decodedLayers {
 				//Look for TCP ACK
@@ -336,11 +351,27 @@ func bailout(err error) {
 	}
 }
 
-func getPreferredDevice() (pcap.Interface, net.Interface, error) {
+func getPreferredDevice(config ScanConfig) (pcap.Interface, net.Interface, error) {
 	devices, err := pcap.FindAllDevs()
 	if err != nil {
 		return pcap.Interface{}, net.Interface{}, err
 	}
+
+	if config.Interface != "" {
+		ifx, err := net.InterfaceByName(config.Interface)
+		if err != nil {
+			return pcap.Interface{}, net.Interface{}, err
+		}
+		dev := pcap.Interface{}
+		for _, d := range devices {
+			if d.Name == config.Interface {
+				dev = d
+				break
+			}
+		}
+		return dev, *ifx, err
+	}
+
 	for i := 0; i < 5; i++ {
 		//search in this order: VPN, then non-VPN; from lower interface index 0 up till 4
 		//i.e ppp0, en0, eth0, ppp1, en1, eth1, ...
@@ -352,6 +383,14 @@ func getPreferredDevice() (pcap.Interface, net.Interface, error) {
 				}
 			}
 		}
+	}
+	// try any interface with an IPv4 address
+	for _, dev := range devices {
+		ifx, err := getRoutableInterface(dev)
+		if err != nil {
+			continue
+		}
+		return dev, ifx, err
 	}
 	// give up and bail out
 	return pcap.Interface{}, net.Interface{}, errors.New("Could not find a preferred interface with a routable IP")
@@ -383,8 +422,8 @@ func getIPv4InterfaceAddress(iface pcap.Interface) (pcap.InterfaceAddress, error
 	return pcap.InterfaceAddress{}, errors.New("Could not find an interface with IPv4 address")
 }
 
-func getTimedHandle(bpfFilter string, timeOut time.Duration) *pcap.Handle {
-	dev, _, err := getPreferredDevice()
+func getTimedHandle(bpfFilter string, timeOut time.Duration, config ScanConfig) *pcap.Handle {
+	dev, _, err := getPreferredDevice(config)
 	bailout(err)
 	handle, err := pcap.OpenLive(dev.Name, 65535, false, timeOut)
 	bailout(err)

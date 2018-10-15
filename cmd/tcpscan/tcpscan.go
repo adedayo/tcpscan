@@ -42,6 +42,11 @@ tcpscan 8.8.8.8/32 10.10.10.1/30
 			Usage: "timeout (in seconds) to adjust how much we are willing to wait for servers to come back with responses. Smaller timeout sacrifices accuracy for speed",
 			Value: 5,
 		},
+		&cli.StringFlag{
+			Name:  "interface, i",
+			Usage: "interface to use e.g. eth0, ppp0. If specified, bypasses automated guessing",
+			Value: "",
+		},
 	}
 	app.EnableBashCompletion = true
 
@@ -73,10 +78,12 @@ func process(c *cli.Context) error {
 	args = append(args, c.Args().Tail()...)
 	scan := make(map[string]portscan.PortACK)
 	config := portscan.ScanConfig{
-		Timeout: c.Int("timeout"),
+		Timeout:   c.Int("timeout"),
+		Interface: c.String("interface"),
 	}
 	for ack := range portscan.ScanCIDR(config, args...) {
 		key := ack.Host + ack.Port
+		println("found ", ack.Host, ack.Port)
 		if _, present := scan[key]; !present {
 			scan[key] = ack
 		}
