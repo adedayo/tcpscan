@@ -83,7 +83,6 @@ func process(c *cli.Context) error {
 	}
 	for ack := range portscan.ScanCIDR(config, args...) {
 		key := ack.Host + ack.Port
-		println("found ", ack.Host, ack.Port)
 		if _, present := scan[key]; !present {
 			scan[key] = ack
 		}
