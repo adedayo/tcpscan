@@ -6,6 +6,7 @@ else
 	OUTFILE := "tcpscan_$(VERSION_TAG)_$(UNAME_S)_x86_64.tar.gz"
 	ifeq ($(UNAME_S),Linux)
 		BUILDFLAGS += -a -ldflags '-w -extldflags "-static"'
+		$(shell sed -i "s/0.0.0/$(VERSION_TAG)/g" cmd/tcpscan/tcpscan.go)
 	endif
 	ifeq ($(UNAME_S),Darwin)
 		BUILDFLAGS += -a
@@ -19,7 +20,7 @@ tar: build
 	tar cvf $(OUTFILE) tcpscan -C $(GOPATH)/bin
 build:
 	ifeq ($(UNAME_S),Linux)
-		sed -i "s/0.0.0/$(VERSION_TAG)/g" cmd/tcpscan/tcpscan.go
+		$(shell sed -i "s/0.0.0/$(VERSION_TAG)/g" cmd/tcpscan/tcpscan.go)
 	endif
 	go build $(BUILDFLAGS) github.com/adedayo/tcpscan/cmd/tcpscan
 
