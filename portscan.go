@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -89,6 +90,16 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 		ipCount := 1
 		timeout := time.Duration(config.Timeout) * time.Second
 		for _, cidrX := range cidrAddresses {
+			ports := []int{}
+			if strings.Contains(cidrX, ":") {
+				cidrPorts := strings.Split(cidrX, ":")
+				cRange := ""
+				if strings.Contains(cidrX, "/") {
+					cRange = "/" + strings.Split(cidrX, "/")[1]
+				}
+				cidrX = cidrPorts[0] + cRange
+				ports = parsePorts(strings.Split(cidrPorts[1], "/")[0])
+			}
 			ips := cidr.Expand(cidrX)
 			ipCount += len(ips)
 			//restrict filtering to the specified CIDR IPs and listen for inbound ACK packets
@@ -101,9 +112,12 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 			go func() { // run the scans in parallel
 				stopPort := 65535
 				sourcePort := 50000
+				if len(ports) == 0 {
+					ports = knownPorts[:]
+				}
 				for _, dstIP := range ips {
 					dst := net.ParseIP(dstIP)
-					for _, dstPort := range knownPorts {
+					for _, dstPort := range ports {
 						// Send a specified number of SYN packets
 						for i := 0; i < count; i++ {
 							err = sendSYNPacket(src, dst, sourcePort, dstPort, route, handle)
@@ -126,6 +140,42 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 		}
 	}()
 	return out
+}
+
+func parsePorts(portsString string) (ports []int) {
+	pp := strings.Split(portsString, ",")
+	for _, p := range pp {
+		if strings.Contains(p, "-") {
+			ps := strings.Split(p, "-")
+
+			if len(ps) != 2 {
+				continue
+			}
+			i, err := strconv.Atoi(ps[0])
+			if err != nil {
+				continue
+			}
+			j, err := strconv.Atoi(ps[1])
+			if err != nil {
+				continue
+			}
+
+			if j < i {
+				i, j = j, i
+			}
+			for index := i; index < j; index++ {
+				ports = append(ports, index)
+			}
+
+		} else {
+			i, err := strconv.Atoi(p)
+			if err != nil {
+				continue
+			}
+			ports = append(ports, i)
+		}
+	}
+	return
 }
 
 //allow domains to be used in CIDRs
