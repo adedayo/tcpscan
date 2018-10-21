@@ -73,6 +73,9 @@ func process(c *cli.Context) error {
 		c.App.Run([]string{"tcpscan", "h"})
 		return nil
 	}
+	if !c.GlobalBool("json") {
+		fmt.Printf("Starting TCPScan %s (%s)\n\n", version, "https://github.com/adedayo/tcpscan")
+	}
 	args := []string{}
 	args = append(args, c.Args().First())
 	args = append(args, c.Args().Tail()...)
@@ -98,7 +101,6 @@ func process(c *cli.Context) error {
 	if c.GlobalBool("json") {
 		outputJSON(portAckList)
 	} else {
-		fmt.Printf("Starting TCPScan %s (%s)\n\n", version, "https://github.com/adedayo/tcpscan")
 		outputText(portAckList)
 	}
 	return nil

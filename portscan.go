@@ -274,7 +274,9 @@ func determineRouterHardwareAddress(config ScanConfig) (net.HardwareAddr, error)
 	bailout(err)
 	handle := getTimedHandle(fmt.Sprintf("host %s and ether dst %s", google, iface.HardwareAddr.String()), 5*time.Second, config)
 	out := listenForEthernetPackets(handle)
-	_, _ = net.Dial("tcp", fmt.Sprintf("%s:443", google))
+	go func() {
+		_, _ = net.DialTimeout("tcp", fmt.Sprintf("%s:443", google), 5*time.Second)
+	}()
 	select {
 	case hwAddress := <-out:
 		return hwAddress, nil
