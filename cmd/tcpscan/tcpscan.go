@@ -98,6 +98,7 @@ func process(c *cli.Context) error {
 	if c.GlobalBool("json") {
 		outputJSON(portAckList)
 	} else {
+		fmt.Printf("Starting TCPScan %s (%s)\n\n", version, "https://github.com/adedayo/tcpscan")
 		outputText(portAckList)
 	}
 	return nil
