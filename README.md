@@ -1,9 +1,52 @@
 [![Build Status](https://travis-ci.org/adedayo/tcpscan.svg?branch=master)](https://travis-ci.org/adedayo/tcpscan)
 
 # TCPScan 
-TCPScan is a simple utility for discovering open (or closed) TCP ports on servers. It uses `gopacket`(https://github.com/google/gopacket) to craft SYN packets, listening asynchronously for (SYN-)ACK or RST responses without completing the full TCP handshake. TCPScan uses goroutines for asynchronous scans and it searches for the most likely listening ports first, using NMap's "port frequency" ordering. Anecdotal results show that TCPScan is really fast!
+TCPScan is a simple utility for discovering open (or closed) TCP ports on servers. It uses `gopacket`(https://github.com/google/gopacket) to craft SYN packets, listening asynchronously for (SYN-)ACK or RST responses without completing the full TCP handshake. TCPScan uses goroutines for asynchronous scans and it searches for the most likely listening ports first, using NMap's "port frequency" ordering. Anecdotal results show that TCPScan is fast!
 
 TCPScan is not a replacement for the awesome NMap tool, but it promises to be a useful library for go applications that need a fast and simple TCP port scanning capability.
+
+## Using it as a command-line tool
+TCPScan is also available as a command-line tool. 
+
+### Installation
+Prebuilt binaries may be found for your operating system here: https://github.com/adedayo/tcpscan/releases
+
+For macOS X, you could install via brew as follows:
+```bash
+brew tap adedayo/tap
+brew install tcpscan
+``` 
+
+### Scanning CIDR ranges
+
+```bash
+tcpscan 192.168.2.5/30 10.11.12.13/31
+```
+
+For JSON-formatted output simply add the `--json` or `-j` flag:
+
+```bash
+tcpscan --json 192.168.2.5/30 10.11.12.13/31
+```
+Depending on the fidelity of the network being scanned or the size of CIDR ranges, it may be expedient to adjust the scan timeout accordingly with the `--timeout` or `-t` flag, which indicates the number of seconds to wait for ACK or RST responses as follows:
+
+```bash
+tcpscan --json --timeout 5 192.168.2.5/30 10.11.12.13/31
+```
+
+Note that scans generally run faster with shorter timeouts, but you may be sacrificing accuracy on slow networks or for large CIDR ranges.
+
+### Command line options
+
+```bash
+   --json, -j                   generate JSON output
+   --timeout value, -t value    timeout (in seconds) to adjust how much we are willing to wait for servers to come back with responses. Smaller timeout sacrifices accuracy for speed (default: 5)
+   --rate value, -r value       the rates (in packets per second) that we should send SYN scan packets. This influences overall scan time, but be careful not to overwhelm your network (default: 1000)
+   --quiet, -q                  control whether to produce a running commentary of intermediate results or stay quiet till the end
+   --interface value, -i value  interface to use e.g. eth0, ppp0. If specified, bypasses automated guessing
+   --help, -h                   show help
+   --version, -v                print the version
+```
 
 ## Using TCPScan as a library
 In order to start, go get this repository:
@@ -57,37 +100,6 @@ This should produce an output similar to the following:
 8.8.8.8:        Port 119(nntp) is Open
 8.8.8.8:        Port 8010 is Open
 ```
-
-## Using it as a command-line tool
-TCPScan is also available as a command-line tool. 
-
-### Installation
-Prebuilt binaries may be found for your operating system here: https://github.com/adedayo/tcpscan/releases
-
-For macOS X, you could install via brew as follows:
-```bash
-brew tap adedayo/tap
-brew install tcpscan
-``` 
-
-### Scanning CIDR ranges
-
-```bash
-tcpscan 192.168.2.5/30 10.11.12.13/31
-```
-
-For JSON-formatted output simply add the `--json` or `-j` flag:
-
-```bash
-tcpscan --json 192.168.2.5/30 10.11.12.13/31
-```
-Depending on the fidelity of the network being scanned or the size of CIDR ranges, it may be expedient to adjust the scan timeout accordingly with the `--timeout` or `-t` flag, which indicates the number of seconds to wait for ACK or RST responses as follows:
-
-```bash
-tcpscan --json --timeout 5 192.168.2.5/30 10.11.12.13/31
-```
-
-Note that scans generally run faster with shorter timeouts, but you may be sacrificing accuracy on slow networks or for large CIDR ranges.
 
 ## An issue on macOS
 You may encounter errors such as 
