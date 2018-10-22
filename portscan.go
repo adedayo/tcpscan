@@ -149,14 +149,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 				}
 			}()
 		}
-		// wait for a factor of the total number of IPs and ports
-		// wait := (ipCount * portCount) / (8 * rate)
-		// fmt.Printf("Estimated Wait: %d seconds", wait)
-		// delay := time.Duration(wait) * time.Second
-		// time.Sleep(delay)
-
-		for range merge(stoppers...) {
-			//wait for the completion or timeouts
+		for range merge(stoppers...) { //wait for the completion or timeouts
 		}
 	}()
 	return out
