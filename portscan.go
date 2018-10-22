@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	mathrand "math/rand"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -16,6 +18,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
+	"go.uber.org/ratelimit"
 )
 
 var (
@@ -68,6 +71,14 @@ type routeFinder struct {
 //ScanCIDR scans for open TCP ports in IP addresses within a CIDR range
 func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 	out := make(chan PortACK)
+	rate := 1000
+	if config.PacketsPerSecond > 0 {
+		rate = config.PacketsPerSecond
+	} else {
+		fmt.Printf("Invalid packets per second: %d. Terminating\n", config.PacketsPerSecond)
+		os.Exit(1)
+	}
+	rl := ratelimit.New(rate) //ratelimit number of packets per second
 	go func() {
 		defer close(out)
 		//get the network interface to use for scanning: ppp0, eth0, en0 etc.
@@ -87,7 +98,8 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 		}
 
 		stoppers := []<-chan bool{}
-		ipCount := 1
+		ipCount := 0
+		portCount := 0
 		timeout := time.Duration(config.Timeout) * time.Second
 		for _, cidrX := range cidrAddresses {
 			ports := []int{}
@@ -100,8 +112,16 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 				cidrX = cidrPorts[0] + cRange
 				ports = parsePorts(strings.Split(cidrPorts[1], "/")[0])
 			}
+			if len(ports) == 0 {
+				ports = knownPorts[:]
+			}
+			portCount += len(ports)
 			ips := cidr.Expand(cidrX)
 			ipCount += len(ips)
+			//shuffle the IP addresses pseudo-randomly
+			mathrand.Shuffle(len(ips), func(i, j int) {
+				ips[i], ips[j] = ips[j], ips[i]
+			})
 			//restrict filtering to the specified CIDR IPs and listen for inbound ACK packets
 			filter := fmt.Sprintf(`net %s and not src host %s`, getNet(cidrX), src.String())
 			handle := getTimedHandle(filter, timeout, config)
@@ -112,14 +132,12 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 			go func() { // run the scans in parallel
 				stopPort := 65535
 				sourcePort := 50000
-				if len(ports) == 0 {
-					ports = knownPorts[:]
-				}
-				for _, dstIP := range ips {
-					dst := net.ParseIP(dstIP)
-					for _, dstPort := range ports {
+				for _, dstPort := range ports {
+					for _, dstIP := range ips {
+						dst := net.ParseIP(dstIP)
 						// Send a specified number of SYN packets
 						for i := 0; i < count; i++ {
+							rl.Take()
 							err = sendSYNPacket(src, dst, sourcePort, dstPort, route, handle)
 							bailout(err)
 							sourcePort++
@@ -132,8 +150,10 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 			}()
 		}
 		// wait for a factor of the total number of IPs and ports
-		delay := time.Duration(ipCount*len(knownPorts)/50) * time.Millisecond
-		time.Sleep(delay)
+		// wait := (ipCount * portCount) / (8 * rate)
+		// fmt.Printf("Estimated Wait: %d seconds", wait)
+		// delay := time.Duration(wait) * time.Second
+		// time.Sleep(delay)
 
 		for range merge(stoppers...) {
 			//wait for the completion or timeouts
@@ -373,11 +393,15 @@ func listenForACKPackets(filter string, route routeFinder, timeout time.Duration
 				//Look for TCP ACK
 				if lyr.Contains(layers.LayerTypeTCP) {
 					if tcp.ACK {
-						output <- PortACK{
+						ack := PortACK{
 							Host: ip.SrcIP.String(),
 							Port: strings.Split(tcp.SrcPort.String(), "(")[0],
 							SYN:  tcp.SYN,
 							RST:  tcp.RST,
+						}
+						output <- ack
+						if !config.Quiet && ack.IsOpen() {
+							fmt.Printf("%s:%s (%s) is %s\n", ack.Host, ack.Port, ack.GetServiceName(), ack.Status())
 						}
 						break
 					}

@@ -8,7 +8,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/adedayo/cidr"
 	"github.com/adedayo/tcpscan"
 	"github.com/urfave/cli"
 )
@@ -42,6 +44,15 @@ tcpscan 8.8.8.8/32 10.10.10.1/30
 			Usage: "timeout (in seconds) to adjust how much we are willing to wait for servers to come back with responses. Smaller timeout sacrifices accuracy for speed",
 			Value: 5,
 		},
+		&cli.IntFlag{
+			Name:  "rate, r",
+			Usage: "the rates (in packets per second) that we should send SYN scan packets. This influences overall scan time, but be careful not to overwhelm your network",
+			Value: 1000,
+		},
+		cli.BoolFlag{
+			Name:  "quiet, q",
+			Usage: "control whether to produce a running commentary of intermediate results or stay quiet till the end",
+		},
 		&cli.StringFlag{
 			Name:  "interface, i",
 			Usage: "interface to use e.g. eth0, ppp0. If specified, bypasses automated guessing",
@@ -74,15 +85,18 @@ func process(c *cli.Context) error {
 		return nil
 	}
 	if !c.GlobalBool("json") {
-		fmt.Printf("Starting TCPScan %s (%s)\n\n", version, "https://github.com/adedayo/tcpscan")
+		fmt.Printf("Starting TCPScan %s (%s)\n", version, "https://github.com/adedayo/tcpscan")
 	}
+	t := time.Now()
 	args := []string{}
 	args = append(args, c.Args().First())
 	args = append(args, c.Args().Tail()...)
 	scan := make(map[string]portscan.PortACK)
 	config := portscan.ScanConfig{
-		Timeout:   c.Int("timeout"),
-		Interface: c.String("interface"),
+		Timeout:          c.Int("timeout"),
+		PacketsPerSecond: c.Int("rate"),
+		Quiet:            c.Bool("quiet"),
+		Interface:        c.String("interface"),
 	}
 	for ack := range portscan.ScanCIDR(config, args...) {
 		key := ack.Host + ack.Port
@@ -103,6 +117,11 @@ func process(c *cli.Context) error {
 	} else {
 		outputText(portAckList)
 	}
+	hosts := []string{}
+	for _, h := range args {
+		hosts = append(hosts, cidr.Expand(h)...)
+	}
+	fmt.Printf("Scanned %d hosts in %f seconds", len(hosts), time.Since(t).Seconds())
 	return nil
 }
 

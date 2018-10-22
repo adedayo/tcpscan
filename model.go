@@ -14,6 +14,10 @@ import (
 type ScanConfig struct {
 	//How long to wait listening for TCP ACK/RST responses
 	Timeout int
+	//Number of Packets per Second to send out during scan
+	PacketsPerSecond int
+	//Should a running commentary of results be generated?
+	Quiet bool
 	//If not empty, indicates which network interface to use, bypassing automated guessing
 	Interface string
 }
