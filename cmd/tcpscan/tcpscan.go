@@ -46,7 +46,7 @@ tcpscan 8.8.8.8/32 10.10.10.1/30
 		},
 		&cli.IntFlag{
 			Name:  "rate, r",
-			Usage: "the rates (in packets per second) that we should send SYN scan packets. This influences overall scan time, but be careful not to overwhelm your network",
+			Usage: "the rate (in packets per second) that we should send SYN scan packets. This influences overall scan time, but be careful not to overwhelm your network",
 			Value: 1000,
 		},
 		cli.BoolFlag{
@@ -121,7 +121,7 @@ func process(c *cli.Context) error {
 	for _, h := range args {
 		hosts = append(hosts, cidr.Expand(h)...)
 	}
-	fmt.Printf("Scanned %d hosts in %f seconds", len(hosts), time.Since(t).Seconds())
+	fmt.Printf("Scanned %d hosts in %f seconds\n", len(hosts), time.Since(t).Seconds())
 	return nil
 }
 

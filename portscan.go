@@ -125,7 +125,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 			//restrict filtering to the specified CIDR IPs and listen for inbound ACK packets
 			filter := fmt.Sprintf(`net %s and not src host %s`, getNet(cidrX), src.String())
 			handle := getTimedHandle(filter, timeout, config)
-			stopper := listenForACKPackets(filter, route, timeout, out, config)
+			stopper := listenForACKPackets(getNet(cidrX), filter, route, timeout, out, config)
 			stoppers = append(stoppers, stopper)
 			count := 1 //Number of SYN packets to send per port (make this a parameter)
 			//Send SYN packets asynchronously
@@ -349,7 +349,11 @@ func (ppp *MyPPP) NextLayerType() gopacket.LayerType {
 }
 
 //listenForACKPackets collects packets on the network that meet port scan specifications
-func listenForACKPackets(filter string, route routeFinder, timeout time.Duration, output chan<- PortACK, config ScanConfig) chan bool {
+func listenForACKPackets(cidrRange, filter string, route routeFinder, timeout time.Duration, output chan<- PortACK, config ScanConfig) chan bool {
+	expandedRange := make(map[string]bool)
+	for _, rng := range cidr.Expand(cidrRange) {
+		expandedRange[rng] = true
+	}
 	done := make(chan bool)
 	var ip layers.IPv4
 	var tcp layers.TCP
@@ -385,7 +389,7 @@ func listenForACKPackets(filter string, route routeFinder, timeout time.Duration
 			for _, lyr := range decodedLayers {
 				//Look for TCP ACK
 				if lyr.Contains(layers.LayerTypeTCP) {
-					if tcp.ACK {
+					if _, belongsToRange := expandedRange[ip.SrcIP.String()]; tcp.ACK && belongsToRange {
 						ack := PortACK{
 							Host: ip.SrcIP.String(),
 							Port: strings.Split(tcp.SrcPort.String(), "(")[0],
