@@ -114,12 +114,12 @@ chmod +x fix-bpf-permissions.sh
 ./fix-bpf-permissions.sh  
 ```
 
-You should be good to go! This works across reboots. Note that this is a common problem for tools such as Wireshark, TCPDump etc. that need to read from or write to /dev/bpf*. This solution should fix the problem for all of them - the idea was actually stolen from Wireshark with some modifications :-).
+You should be good to go! You may need to reboot once, but this works across reboots. Note that this is a common problem for tools such as Wireshark, TCPDump etc. that need to read from or write to /dev/bpf*. This solution should fix the problem for all of them - the idea was actually stolen from Wireshark with some modifications :-).
 
 ## Running as non-root on Linux
 You ideally want to be able to run `tcpscan` as an ordinary user, say, `my_user`, but since `tcpscan` sends raw packets you need to adjust capabilities to allow it to do so. The following may be necessary:
 
-Ensure the following two lines are in _/etc//security/capability.conf_
+Ensure the following two lines are in _/etc/security/capability.conf_
 ```bash
 cap_net_admin   my_user
 none *
