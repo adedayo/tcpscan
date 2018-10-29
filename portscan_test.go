@@ -7,7 +7,8 @@ import (
 func Test(t *testing.T) {
 	ipRange := "8.8.8.8/32"
 	scan := make(map[string]PortACK)
-	result := ScanCIDR(ScanConfig{Timeout: 10}, ipRange)
+	result := ScanCIDR(ScanConfig{Timeout: 10,
+		PacketsPerSecond: 1000}, ipRange)
 	for ack := range result {
 		key := ack.Host + ack.Port
 		if _, present := scan[key]; !present {
@@ -20,7 +21,8 @@ func Test(t *testing.T) {
 }
 
 func TestGetRouterHW(t *testing.T) {
-	_, err := determineRouterHardwareAddress(ScanConfig{})
+	_, err := determineRouterHardwareAddress(ScanConfig{Timeout: 20,
+		PacketsPerSecond: 1000})
 	if err != nil {
 		t.Error(err.Error())
 	}
