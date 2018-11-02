@@ -462,10 +462,10 @@ func getPreferredDevice(config ScanConfig) (pcap.Interface, net.Interface, error
 	// see https://github.com/systemd/systemd/blob/master/src/udev/udev-builtin-net_id.c
 	// note that this is a simple algorithm, not rigorous
 	interfaces := []string{"en", "ib", "sl", "wl", "ww"}
-	typeNames := []string{"b", "c", "o", "s", "x", "v", "a"}
+	typeNames := []string{"b", "c", "o", "s", "p", "x", "v", "a"}
 	for _, iface := range interfaces {
 		for _, tn := range typeNames {
-			for _, i := range []int{0, 1} { //only try the first two possible index numbers
+			for _, i := range []int{0, 1, 2, 3} { //only try the first four possible index numbers
 				for _, dev := range devices {
 					if strings.HasPrefix(dev.Name, fmt.Sprintf("%s%s", iface, tn)) &&
 						strings.HasSuffix(dev.Name, fmt.Sprintf("%d", i)) {
