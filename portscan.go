@@ -8,6 +8,7 @@ import (
 	"io"
 	mathrand "math/rand"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -76,6 +77,12 @@ type routeFinder struct {
 //ScanCIDR scans for open TCP ports in IP addresses within a CIDR range
 func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 	out := make(chan PortACK)
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Error: %+v\n", r)
+			os.Exit(1)
+		}
+	}()
 	rate := 1000
 	if config.PacketsPerSecond > 0 {
 		rate = config.PacketsPerSecond
@@ -440,6 +447,7 @@ func listenForACKPackets(cidrRange, filter string, route routeFinder, timeout ti
 func bailout(err error) {
 	if err != nil {
 		panic(err.Error())
+
 	}
 }
 
