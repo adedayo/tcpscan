@@ -21,7 +21,7 @@ func Test(t *testing.T) {
 }
 
 func TestGetRouterHW(t *testing.T) {
-	_, err := determineRouterHardwareAddress(ScanConfig{Timeout: 20,
+	_, err := determineRouterHardwareAddress(ScanConfig{Timeout: 5,
 		PacketsPerSecond: 1000})
 	if err != nil {
 		t.Error(err.Error())

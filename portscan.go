@@ -8,7 +8,6 @@ import (
 	"io"
 	mathrand "math/rand"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -60,12 +59,18 @@ var (
 			OptionType: layers.TCPOptionKindEndList,
 		},
 	}
+
+	lastConfig ScanConfig
+	lastRoute  routeFinder
 )
 
 type routeFinder struct {
 	IsPPP           bool
 	SrcHardwareAddr net.HardwareAddr
 	DstHardwareAddr net.HardwareAddr
+	SrcIP           net.IP
+	Device          pcap.Interface
+	Interface       net.Interface
 }
 
 //ScanCIDR scans for open TCP ports in IP addresses within a CIDR range
@@ -75,28 +80,14 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 	if config.PacketsPerSecond > 0 {
 		rate = config.PacketsPerSecond
 	} else {
-		fmt.Printf("Invalid packets per second: %d. Terminating\n", config.PacketsPerSecond)
-		os.Exit(1)
+		fmt.Printf("Invalid packets per second: %d. Stopping\n", config.PacketsPerSecond)
+		close(out)
+		return out
 	}
 	rl := ratelimit.New(rate) //ratelimit number of packets per second
+	route := getRoute(config)
 	go func() {
 		defer close(out)
-		//get the network interface to use for scanning: ppp0, eth0, en0 etc.
-		dev, netIface, err := getPreferredDevice(config)
-		bailout(err)
-		route := routeFinder{}
-		iface, err := getIPv4InterfaceAddress(dev)
-		bailout(err)
-		src := iface.IP
-		if strings.HasPrefix(dev.Name, "ppp") {
-			route.IsPPP = true
-		} else {
-			routerHW, err := determineRouterHardwareAddress(config)
-			bailout(err)
-			route.SrcHardwareAddr = netIface.HardwareAddr
-			route.DstHardwareAddr = routerHW
-		}
-
 		stoppers := []<-chan bool{}
 		ipCount := 0
 		portCount := 0
@@ -123,7 +114,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 				ips[i], ips[j] = ips[j], ips[i]
 			})
 			//restrict filtering to the specified CIDR IPs and listen for inbound ACK packets
-			filter := fmt.Sprintf(`net %s and not src host %s`, getNet(cidrX), src.String())
+			filter := fmt.Sprintf(`net %s and not src host %s`, getNet(cidrX), route.SrcIP.String())
 			handle := getTimedHandle(filter, timeout, config)
 			stopper := listenForACKPackets(getNet(cidrX), filter, route, timeout, out, config)
 			stoppers = append(stoppers, stopper)
@@ -138,7 +129,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 						// Send a specified number of SYN packets
 						for i := 0; i < count; i++ {
 							rl.Take()
-							err = sendSYNPacket(src, dst, sourcePort, dstPort, route, handle)
+							err := sendSYNPacket(route.SrcIP, dst, sourcePort, dstPort, route, handle)
 							bailout(err)
 							sourcePort++
 							if sourcePort > stopPort {
@@ -153,6 +144,34 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 		}
 	}()
 	return out
+}
+
+//a hopefully more performant route finder that doesnt re-do the work
+func getRoute(config ScanConfig) routeFinder {
+	//use precomputed
+	if config == lastConfig {
+		return lastRoute
+	}
+	//get the network interface to use for scanning: ppp0, eth0, en0 etc.
+	route := routeFinder{}
+	dev, netIface, err := getPreferredDevice(config)
+	bailout(err)
+	route.Device = dev
+	route.Interface = netIface
+	iface, err := getIPv4InterfaceAddress(dev)
+	bailout(err)
+	route.SrcIP = iface.IP
+	if strings.HasPrefix(dev.Name, "ppp") {
+		route.IsPPP = true
+	} else {
+		routerHW, err := determineRouterHardwareAddress(config)
+		bailout(err)
+		route.SrcHardwareAddr = netIface.HardwareAddr
+		route.DstHardwareAddr = routerHW
+	}
+	lastConfig = config
+	lastRoute = route
+	return route
 }
 
 func parsePorts(portsString string) (ports []int) {
@@ -425,6 +444,10 @@ func bailout(err error) {
 }
 
 func getPreferredDevice(config ScanConfig) (pcap.Interface, net.Interface, error) {
+	if config == lastConfig { //shortcut if we've already obtained the device
+		return lastRoute.Device, lastRoute.Interface, nil
+	}
+
 	devices, err := pcap.FindAllDevs()
 	if err != nil {
 		return pcap.Interface{}, net.Interface{}, err
