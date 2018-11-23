@@ -108,15 +108,18 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 			ports = parsePorts(strings.Split(cidrPorts[1], "/")[0])
 		}
 		cidrX = getNet(cidrX)
-		cidrXs = append(cidrXs, "net "+cidrX)
 		if len(ports) == 0 {
 			ports = knownPorts[:]
 		}
-		if _, present := cidrPortMap[cidrX]; !present {
+		if currentPorts, present := cidrPortMap[cidrX]; !present {
 			cidrPortMap[cidrX] = ports
+		} else {
+			cidrPortMap[cidrX] = append(currentPorts, ports...)
 		}
 	}
-
+	for cidrX := range cidrPortMap {
+		cidrXs = append(cidrXs, "net "+cidrX)
+	}
 	//restrict filtering to the specified CIDR IPs and listen for inbound ACK packets
 	filter := fmt.Sprintf(`(%s) and not src host %s`, strings.Join(cidrXs, " or "), route.SrcIP.String())
 	handle := getHandle(filter, config)
