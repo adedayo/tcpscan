@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/adedayo/cidr"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
@@ -93,41 +94,45 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 	}
 	rl := ratelimit.New(rate) //ratelimit number of packets per second
 	route := getRoute(config)
+	cidrXs := []string{}
+	cidrPortMap := make(map[string][]int)
+	for _, cidrX := range cidrAddresses {
+		ports := []int{}
+		if strings.Contains(cidrX, ":") {
+			cidrPorts := strings.Split(cidrX, ":")
+			cRange := ""
+			if strings.Contains(cidrX, "/") {
+				cRange = "/" + strings.Split(cidrX, "/")[1]
+			}
+			cidrX = cidrPorts[0] + cRange
+			ports = parsePorts(strings.Split(cidrPorts[1], "/")[0])
+		}
+		cidrX = getNet(cidrX)
+		cidrXs = append(cidrXs, "net "+cidrX)
+		if len(ports) == 0 {
+			ports = knownPorts[:]
+		}
+		if _, present := cidrPortMap[cidrX]; !present {
+			cidrPortMap[cidrX] = ports
+		}
+	}
+
+	//restrict filtering to the specified CIDR IPs and listen for inbound ACK packets
+	filter := fmt.Sprintf(`(%s) and not src host %s`, strings.Join(cidrXs, " or "), route.SrcIP.String())
+	handle := getHandle(filter, config)
+	listenForACKPackets(handle, route, out, config)
+
 	go func() {
-		defer close(out)
-		stoppers := []<-chan bool{}
-		ipCount := 0
-		portCount := 0
-		timeout := time.Duration(config.Timeout) * time.Second
-		for _, cidrX := range cidrAddresses {
-			ports := []int{}
-			if strings.Contains(cidrX, ":") {
-				cidrPorts := strings.Split(cidrX, ":")
-				cRange := ""
-				if strings.Contains(cidrX, "/") {
-					cRange = "/" + strings.Split(cidrX, "/")[1]
-				}
-				cidrX = cidrPorts[0] + cRange
-				ports = parsePorts(strings.Split(cidrPorts[1], "/")[0])
-			}
-			if len(ports) == 0 {
-				ports = knownPorts[:]
-			}
-			portCount += len(ports)
-			ips := cidr.Expand(cidrX)
-			ipCount += len(ips)
+		for cidrX, cidrPorts := range cidrPortMap {
+			ipAdds := cidr.Expand(cidrX)
 			//shuffle the IP addresses pseudo-randomly
-			mathrand.Shuffle(len(ips), func(i, j int) {
-				ips[i], ips[j] = ips[j], ips[i]
+			mathrand.Shuffle(len(ipAdds), func(i, j int) {
+				ipAdds[i], ipAdds[j] = ipAdds[j], ipAdds[i]
 			})
-			//restrict filtering to the specified CIDR IPs and listen for inbound ACK packets
-			filter := fmt.Sprintf(`net %s and not src host %s`, getNet(cidrX), route.SrcIP.String())
-			handle := getTimedHandle(filter, timeout, config)
-			stopper := listenForACKPackets(getNet(cidrX), filter, route, timeout, out, config)
-			stoppers = append(stoppers, stopper)
+
 			count := 1 //Number of SYN packets to send per port (make this a parameter)
 			//Send SYN packets asynchronously
-			go func() { // run the scans in parallel
+			go func(ips []string, ports []int) { // run the scans in parallel
 				stopPort := 65535
 				sourcePort := 50000
 				for _, dstPort := range ports {
@@ -145,10 +150,16 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 						}
 					}
 				}
-			}()
+
+			}(ipAdds, cidrPorts)
 		}
-		for range merge(stoppers...) { //wait for the completion or timeouts
+
+		timeout := time.Duration(config.Timeout) * time.Second
+		select {
+		case <-time.After(timeout):
+			handle.Error() //not sure why this works to close out the handle!
 		}
+		close(out)
 	}()
 	return out
 }
@@ -375,12 +386,13 @@ func (ppp *MyPPP) NextLayerType() gopacket.LayerType {
 }
 
 //listenForACKPackets collects packets on the network that meet port scan specifications
-func listenForACKPackets(cidrRange, filter string, route routeFinder, timeout time.Duration, output chan<- PortACK, config ScanConfig) chan bool {
-	expandedRange := make(map[string]bool)
-	for _, rng := range cidr.Expand(cidrRange) {
-		expandedRange[rng] = true
-	}
-	done := make(chan bool)
+func listenForACKPackets(handle *pcap.Handle, route routeFinder, output chan<- PortACK, config ScanConfig) {
+
+	// expandedRange := make(map[string]bool)
+	// for _, rng := range cidr.Expand(cidrRange) {
+	// 	expandedRange[rng] = true
+	// }
+	// done := make(chan bool)
 	var ip layers.IPv4
 	var tcp layers.TCP
 	var parser *gopacket.DecodingLayerParser
@@ -393,11 +405,12 @@ func listenForACKPackets(cidrRange, filter string, route routeFinder, timeout ti
 	}
 
 	decodedLayers := []gopacket.LayerType{}
-	handle := getTimedHandle(filter, timeout, config)
+
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	go func() {
 		// for packet := range packetSource.Packets() {
 		for {
+
 			packet, err := packetSource.NextPacket()
 			if err == io.EOF {
 				break
@@ -406,8 +419,8 @@ func listenForACKPackets(cidrRange, filter string, route routeFinder, timeout ti
 				if err.Error() == pcap.NextErrorTimeoutExpired.Error() {
 					continue
 				} else {
-					//some other error, will be useful for debugging
-					// println(err.Error())
+					// some other error, will be useful for debugging
+					println(err.Error())
 				}
 			}
 
@@ -415,33 +428,33 @@ func listenForACKPackets(cidrRange, filter string, route routeFinder, timeout ti
 			for _, lyr := range decodedLayers {
 				//Look for TCP ACK
 				if lyr.Contains(layers.LayerTypeTCP) {
-					if _, belongsToRange := expandedRange[ip.SrcIP.String()]; tcp.ACK && belongsToRange {
-						ack := PortACK{
-							Host: ip.SrcIP.String(),
-							Port: strings.Split(tcp.SrcPort.String(), "(")[0],
-							SYN:  tcp.SYN,
-							RST:  tcp.RST,
-						}
-						output <- ack
-						if !config.Quiet && ack.IsOpen() {
-							fmt.Printf("%s:%s (%s) is %s\n", ack.Host, ack.Port, ack.GetServiceName(), ack.Status())
-						}
-						break
+					// if _, belongsToRange := expandedRange[ip.SrcIP.String()]; tcp.ACK && belongsToRange {
+					ack := PortACK{
+						Host: ip.SrcIP.String(),
+						Port: strings.Split(tcp.SrcPort.String(), "(")[0],
+						SYN:  tcp.SYN,
+						RST:  tcp.RST,
 					}
+					output <- ack
+					if !config.Quiet && ack.IsOpen() {
+						fmt.Printf("%s:%s (%s) is %s\n", ack.Host, ack.Port, ack.GetServiceName(), ack.Status())
+					}
+					break
+					// }
 				}
 			}
-		}
-		close(done)
-	}()
 
-	//stop after timeout
-	go func() {
-		select {
-		case <-time.After(timeout):
-			handle.Close()
 		}
+		// close(done)
 	}()
-	return done
+	//stop after timeout
+	// go func() {
+	// 	select {
+	// 	case <-time.After(timeout):
+	// 		handle.Close()
+	// 	}
+	// }()
+	// return done, handle
 }
 
 func bailout(err error) {
@@ -552,6 +565,15 @@ func getTimedHandle(bpfFilter string, timeOut time.Duration, config ScanConfig) 
 	dev, _, err := getPreferredDevice(config)
 	bailout(err)
 	handle, err := pcap.OpenLive(dev.Name, 65535, false, timeOut)
+	bailout(err)
+	handle.SetBPFFilter(bpfFilter)
+	return handle
+}
+
+func getHandle(bpfFilter string, config ScanConfig) *pcap.Handle {
+	dev, _, err := getPreferredDevice(config)
+	bailout(err)
+	handle, err := pcap.OpenLive(dev.Name, 65535, false, pcap.BlockForever)
 	bailout(err)
 	handle.SetBPFFilter(bpfFilter)
 	return handle
