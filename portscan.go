@@ -77,7 +77,6 @@ type routeFinder struct {
 
 //ScanCIDR scans for open TCP ports in IP addresses within a CIDR range
 func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
-	out := make(chan PortACK)
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Printf("Error: %+v\n", r)
@@ -88,9 +87,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 	if config.PacketsPerSecond > 0 {
 		rate = config.PacketsPerSecond
 	} else {
-		fmt.Printf("Invalid packets per second: %d. Stopping\n", config.PacketsPerSecond)
-		close(out)
-		return out
+		panic(fmt.Errorf("Invalid packets per second: %d. Stopping", config.PacketsPerSecond))
 	}
 	rl := ratelimit.New(rate) //ratelimit number of packets per second
 	route := getRoute(config)
@@ -123,9 +120,10 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 	//restrict filtering to the specified CIDR IPs and listen for inbound ACK packets
 	filter := fmt.Sprintf(`(%s) and not src host %s`, strings.Join(cidrXs, " or "), route.SrcIP.String())
 	handle := getHandle(filter, config)
-	listenForACKPackets(handle, route, out, config)
+	out := listenForACKPackets(handle, route, config)
 
 	go func() {
+
 		for cidrX, cidrPorts := range cidrPortMap {
 			ipAdds := cidr.Expand(cidrX)
 			//shuffle the IP addresses pseudo-randomly
@@ -136,6 +134,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 			count := 1 //Number of SYN packets to send per port (make this a parameter)
 			//Send SYN packets asynchronously
 			go func(ips []string, ports []int) { // run the scans in parallel
+				writeHandle := getHandle(filter, config)
 				stopPort := 65535
 				sourcePort := 50000
 				for _, dstPort := range ports {
@@ -144,7 +143,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 						// Send a specified number of SYN packets
 						for i := 0; i < count; i++ {
 							rl.Take()
-							err := sendSYNPacket(route.SrcIP, dst, sourcePort, dstPort, route, handle)
+							err := sendSYNPacket(route.SrcIP, dst, sourcePort, dstPort, route, writeHandle)
 							bailout(err)
 							sourcePort++
 							if sourcePort > stopPort {
@@ -153,16 +152,14 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 						}
 					}
 				}
-
+				writeHandle.Close()
 			}(ipAdds, cidrPorts)
 		}
-
 		timeout := time.Duration(config.Timeout) * time.Second
 		select {
 		case <-time.After(timeout):
-			handle.Error() //not sure why this works to close out the handle!
+			handle.Close()
 		}
-		close(out)
 	}()
 	return out
 }
@@ -317,7 +314,6 @@ func sendSYNPacket(src, dst net.IP, srcPort, dstPrt int, route routeFinder, hand
 		return err
 	}
 	return handle.WritePacketData(buf.Bytes())
-
 }
 
 //determineRouterHardwareAddress finds the router by looking at the ethernet frames that returns the TCP ACK handshake from "google"
@@ -389,13 +385,8 @@ func (ppp *MyPPP) NextLayerType() gopacket.LayerType {
 }
 
 //listenForACKPackets collects packets on the network that meet port scan specifications
-func listenForACKPackets(handle *pcap.Handle, route routeFinder, output chan<- PortACK, config ScanConfig) {
-
-	// expandedRange := make(map[string]bool)
-	// for _, rng := range cidr.Expand(cidrRange) {
-	// 	expandedRange[rng] = true
-	// }
-	// done := make(chan bool)
+func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConfig) <-chan PortACK {
+	output := make(chan PortACK)
 	var ip layers.IPv4
 	var tcp layers.TCP
 	var parser *gopacket.DecodingLayerParser
@@ -411,9 +402,7 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, output chan<- P
 
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	go func() {
-		// for packet := range packetSource.Packets() {
 		for {
-
 			packet, err := packetSource.NextPacket()
 			if err == io.EOF {
 				break
@@ -421,17 +410,16 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, output chan<- P
 			if err != nil {
 				if err.Error() == pcap.NextErrorTimeoutExpired.Error() {
 					continue
-				} else {
-					// some other error, will be useful for debugging
-					println(err.Error())
 				}
+				//  else {
+				// 	// some other error, will be useful for debugging
+				// 	println(err.Error())
+				// }
 			}
-
 			parser.DecodeLayers(packet.Data(), &decodedLayers)
 			for _, lyr := range decodedLayers {
 				//Look for TCP ACK
 				if lyr.Contains(layers.LayerTypeTCP) {
-					// if _, belongsToRange := expandedRange[ip.SrcIP.String()]; tcp.ACK && belongsToRange {
 					ack := PortACK{
 						Host: ip.SrcIP.String(),
 						Port: strings.Split(tcp.SrcPort.String(), "(")[0],
@@ -443,21 +431,12 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, output chan<- P
 						fmt.Printf("%s:%s (%s) is %s\n", ack.Host, ack.Port, ack.GetServiceName(), ack.Status())
 					}
 					break
-					// }
 				}
 			}
-
 		}
-		// close(done)
+		close(output)
 	}()
-	//stop after timeout
-	// go func() {
-	// 	select {
-	// 	case <-time.After(timeout):
-	// 		handle.Close()
-	// 	}
-	// }()
-	// return done, handle
+	return output
 }
 
 func bailout(err error) {
