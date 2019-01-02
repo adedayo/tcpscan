@@ -5,14 +5,17 @@ image:
 clone_folder: c:\gopath\src\github.com\adedayo\tcpscan
 
 environment:
-    matrix:
-      - platform: x64
-        configuration: Release
-        # GETH_ARCH: amd64
-        # MSYS2_ARCH: x86_64
-        # MSYS2_BITS: "64"
-        # MSYSTEM: MINGW64
-        PATH: C:\msys64\mingw64\bin\;C:\Program Files (x86)\NSIS\;%PATH% #make gcc available
+  MYAPP: tcpscan
+  VERSION: ${APPVEYOR_REPO_TAG_NAME}
+  GOARC: amd64
+  matrix:
+    - platform: x64
+      configuration: Release
+      # GETH_ARCH: amd64
+      # MSYS2_ARCH: x86_64
+      # MSYS2_BITS: "64"
+      # MSYSTEM: MINGW64
+      PATH: C:\msys64\mingw64\bin\;C:\Program Files (x86)\NSIS\;%PATH% #make gcc available
 stack: go 1.11
 
 platform: x64
@@ -52,12 +55,10 @@ build_script:
   - go get ./...
   - go build github.com\adedayo\tcpscan\cmd\tcpscan
   - dir
-  - set MYAPP=tcpscan
-  - set VERSION=%APPVEYOR_REPO_TAG_NAME%
-  - set GOARCH=amd64
+  
   # - set PATH=C:\Program Files\go-msi\;%PATH% #go-msi path
   # - go-msi make --msi tcpscan-%VERSION%-%GOARCH%.msi --version %VERSION% --arch %GOARCH%
-  - 7z a tcpscan-%VERSION%-%GOARCH%.zip *.exe
+  - 7z a %MYAPP%-%VERSION%-%GOARCH%.zip *.exe
   - dir
 
 # artifacts:
@@ -66,10 +67,10 @@ build_script:
 
 deploy:
   - provider: GitHub
-    artiifact: /tcpscan.*\.zip/
+    artifact: /tcpscan.*\.zip/
     draft: false
     prerelease: false
-    description: "Release {APPVEYOR_REPO_TAG_NAME}"
+    description: "Release ${VERSION}"
     auth_token:
       secure: WdtmPBg+FpFzcaV8TifOOP6BvkGo1OpvRAfWZv3aZJjVD5PdE/xLrMd8zhrnAxzc
     on:
