@@ -45,6 +45,7 @@ build_script:
   # copy file to where cgo is expecting them to be, see https://github.com/google/gopacket/blob/c5b434497bea7a3417dc45b84c70282c4a5b3b3d/pcap/pcap.go
   - echo f | xcopy Release\pcap_static.lib C:\WpdPack\Lib\x64\wpcap.lib 
   - echo d | xcopy ..\pcap C:\WpdPack\Include
+  - echo d | xcopy ..\pcap C:\WpdPack\Include\pcap # some files are expecting the headers under pcap directory
   - cd ..
   - go get ./...
   - go build github.com\adedayo\tcpscan\cmd\tcpscan
