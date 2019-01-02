@@ -42,7 +42,9 @@ build_script:
   - cmake -DCMAKE_PREFIX_PATH=..\libpcap -G"Visual Studio 15 2017 Win64" ..
   - msbuild /m /nologo /p:Configuration=Release pcap.sln
   # copy file to where cgo is expecting them to be, see https://github.com/google/gopacket/blob/c5b434497bea7a3417dc45b84c70282c4a5b3b3d/pcap/pcap.go
-  - echo f | xcopy Release\pcap_static.lib C:\WpdPack\Lib\x64\wpcap.lib 
+  - echo f | xcopy Release\pcap.exp C:\WpdPack\Lib\x64\wpcap.exp 
+  - echo f | xcopy Release\pcap.lib C:\WpdPack\Lib\x64\wpcap.lib 
+  - echo f | xcopy Release\pcap_static.lib C:\WpdPack\Lib\x64\wpcap_static.lib 
   - echo d | xcopy ..\pcap C:\WpdPack\Include
   - echo d | xcopy ..\pcap C:\WpdPack\Include\pcap # some files are expecting the headers under pcap directory
   - cd ..
