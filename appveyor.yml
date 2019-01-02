@@ -1,5 +1,4 @@
 version: '{branch}.{build}'
-build: "off"
 image:
 - Visual Studio 2017
 
@@ -13,14 +12,14 @@ environment:
         # MSYS2_ARCH: x86_64
         # MSYS2_BITS: "64"
         # MSYSTEM: MINGW64
-        PATH: C:\msys64\mingw64\bin\;C:\Program Files (x86)\NSIS\;%PATH%
+        PATH: C:\msys64\mingw64\bin\;C:\Program Files (x86)\NSIS\;%PATH% #make gcc available
 stack: go 1.11
 
 platform: x64
 
 install:
   - gcc --version
-  - set PATH=%WIX%\bin;%PATH%
+  # - set PATH=%WIX%\bin;%PATH% #this is for WiX
   - choco install winflexbison -y
   - win_flex --version
   - win_bison --version
@@ -29,7 +28,7 @@ install:
   - 7z x libpcap-1.9.0.zip 
   - move libpcap-libpcap-1.9.0 libpcap
   - cd libpcap
-  - choco install go-msi -y
+  # - choco install go-msi -y
   # - appveyor DownloadFile http://www.winpcap.org/install/bin/WpdPack_4_1_2.zip
   # - 7z x .\WpdPack_4_1_2.zip -oWin32
   # - cd ..
@@ -56,17 +55,18 @@ build_script:
   - set MYAPP=tcpscan
   - set VERSION=%APPVEYOR_REPO_TAG_NAME%
   - set GOARCH=amd64
-  - set PATH=C:\Program Files\go-msi\;%PATH%
-  - go-msi make --msi tcpscan-%VERSION%-%GOARCH%.msi --version %VERSION% --arch %GOARCH%
+  # - set PATH=C:\Program Files\go-msi\;%PATH% #go-msi path
+  # - go-msi make --msi tcpscan-%VERSION%-%GOARCH%.msi --version %VERSION% --arch %GOARCH%
+  - 7z a tcpscan-%VERSION%-%GOARCH%.zip *.exe
   - dir
 
 artifacts:
-  - path: '*.msi'
-    name: msi-x64
+  - path: '*.zip'
+    name: zip-x64
 
 deploy:
   - provider: GitHub
-    artiifact: msi-x64
+    artiifact: zip-x64
     draft: false
     prerelease: false
     description: "Release {APPVEYOR_REPO_TAG_NAME}"
