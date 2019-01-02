@@ -20,6 +20,7 @@ platform: x64
 
 install:
   - gcc --version
+  - set PATH=%WIX%\bin;%PATH%
   - choco install winflexbison -y
   - win_flex --version
   - win_bison --version
