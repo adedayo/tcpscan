@@ -20,7 +20,7 @@ platform: x64
 
 install:
   - gcc --version
-  - cinst winflexbison
+  - choco install winflexbison -y
   - win_flex --version
   - win_bison --version
   - appveyor DownloadFile https://github.com/the-tcpdump-group/libpcap/archive/libpcap-1.9.0.zip
@@ -28,6 +28,7 @@ install:
   - 7z x libpcap-1.9.0.zip 
   - move libpcap-libpcap-1.9.0 libpcap
   - cd libpcap
+  - choco install go-msi -y
   # - appveyor DownloadFile http://www.winpcap.org/install/bin/WpdPack_4_1_2.zip
   # - 7z x .\WpdPack_4_1_2.zip -oWin32
   # - cd ..
@@ -51,7 +52,30 @@ build_script:
   - go get ./...
   - go build github.com\adedayo\tcpscan\cmd\tcpscan
   - dir
+  - set MYAPP=tcpscan
+  - set VERSION=%APPVEYOR_REPO_TAG_NAME%
+  - set GOARCH=amd64
+  - go-msi make --msi tcpscan-%VERSION%-%GOARCH%.msi --version %VERSION% --arch %GOARCH%
+  - dir
 
+artifacts:
+  - path: '*.msi'
+    name: msi-x64
+
+deploy:
+  - provider: GitHub
+    artiifact: msi-x64
+    draft: false
+    prerelease: false
+    description: "Release {APPVEYOR_REPO_TAG_NAME}"
+    auth_token:
+      secure: WdtmPBg+FpFzcaV8TifOOP6BvkGo1OpvRAfWZv3aZJjVD5PdE/xLrMd8zhrnAxzc
+    on:
+      branch:
+        - master
+      appveyor_repo_tag: true
+  
+  
 
 # before_build:
 #   - go get ./...
