@@ -60,22 +60,21 @@ build_script:
   - 7z a tcpscan-%VERSION%-%GOARCH%.zip *.exe
   - dir
 
-artifacts:
-  - path: 'tcpscan*.zip'
-    name: zip-x64
+# artifacts:
+#   - path: 'tcpscan*.zip'
+#     name: zip-x64
 
 deploy:
   - provider: GitHub
-    artiifact: zip-x64
+    artiifact: /tcpscan.*\.zip/
     draft: false
     prerelease: false
     description: "Release {APPVEYOR_REPO_TAG_NAME}"
     auth_token:
       secure: WdtmPBg+FpFzcaV8TifOOP6BvkGo1OpvRAfWZv3aZJjVD5PdE/xLrMd8zhrnAxzc
     on:
-      branch:
-        - master
-      appveyor_repo_tag: true
+      branch: master
+      APPVEYOR_REPO_TAG: true
   
   
 
