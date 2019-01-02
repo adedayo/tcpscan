@@ -55,7 +55,7 @@ build_script:
   - set MYAPP=tcpscan
   - set VERSION=%APPVEYOR_REPO_TAG_NAME%
   - set GOARCH=amd64
-  - go-msi make --msi tcpscan-%VERSION%-%GOARCH%.msi --version %VERSION% --arch %GOARCH%
+  - msi make --msi tcpscan-%VERSION%-%GOARCH%.msi --version %VERSION% --arch %GOARCH%
   - dir
 
 artifacts:
