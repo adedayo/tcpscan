@@ -6,7 +6,7 @@ clone_folder: c:\gopath\src\github.com\adedayo\tcpscan
 
 environment:
     global:
-      GOPATH: C:\gopath
+      # GOPATH: C:\gopath
       CC: gcc.exe
     matrix:
       - GETH_ARCH: amd64
