@@ -14,7 +14,7 @@ stack: go 1.11
 platform: x64
 
 install:
-  # - gcc --version
+  - gcc --version
   - cinst winflexbison
   - win_flex --version
   - win_bison --version
