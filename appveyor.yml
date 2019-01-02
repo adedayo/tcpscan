@@ -1,7 +1,6 @@
 version: '{branch}.{build}'
 image:
 - Visual Studio 2017
-build: on
 
 clone_folder: c:\gopath\src\github.com\adedayo\tcpscan
 
@@ -12,11 +11,11 @@ environment:
     matrix:
       - GETH_ARCH: amd64
         MSYS2_ARCH: x86_64
-        MSYS2_BITS: 64
+        MSYS2_BITS: "64"
         MSYSTEM: MINGW64
         PATH: C:\msys64\mingw64\bin\;C:\Program Files (x86)\NSIS\;%PATH%
 
-stack: go 1.10
+stack: go 1.11
 
 platform: x64
 
@@ -30,8 +29,8 @@ install:
   - 7z x libpcap-1.9.0.zip 
   - move libpcap-libpcap-1.9.0 libpcap
   - cd libpcap
-  - appveyor DownloadFile http://www.winpcap.org/install/bin/WpdPack_4_1_2.zip
-  - 7z x .\WpdPack_4_1_2.zip -oWin32
+  # - appveyor DownloadFile http://www.winpcap.org/install/bin/WpdPack_4_1_2.zip
+  # - 7z x .\WpdPack_4_1_2.zip -oWin32
   # - cd ..
   # - cmake .
 
@@ -39,10 +38,10 @@ build_script:
   - type NUL >.devel
   - md build
   - cd build
-  - cmake -DCMAKE_PREFIX_PATH=..\Win32\WpdPack -G"Visual Studio 12 2013" ..
-  - msbuild -nologo  pcap.sln
-  - cmake -DCMAKE_PREFIX_PATH=..\libpcap -G"Visual Studio 12 2013" ..
-  - msbuild -nologo pcap.sln
+  # - cmake -DCMAKE_PREFIX_PATH=..\Win32\WpdPack -G"Visual Studio 12 2013" ..
+  # - msbuild -nologo  pcap.sln
+  - cmake -DCMAKE_PREFIX_PATH=..\libpcap -G"Visual Studio 15 2017 Win64" ..
+  - msbuild /m /nologo /p:Configuration=Release pcap.sln
   - cd ..
   - go get ./...
   - go build github.com\adedayo\tcpscan\cmd\tcpscan
