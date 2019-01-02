@@ -1,26 +1,20 @@
 version: '{branch}.{build}'
+build: "off"
 image:
 - Visual Studio 2017
 
 clone_folder: c:\gopath\src\github.com\adedayo\tcpscan
 
 environment:
-    global:
-      # GOPATH: C:\gopath
-      CC: gcc.exe
     matrix:
-      - GETH_ARCH: amd64
-        MSYS2_ARCH: x86_64
-        MSYS2_BITS: "64"
-        MSYSTEM: MINGW64
-        PATH: C:\msys64\mingw64\bin\;C:\Program Files (x86)\NSIS\;%PATH%
-
+      - platform: x64
+        configuration: Release
 stack: go 1.11
 
 platform: x64
 
 install:
-  - gcc --version
+  # - gcc --version
   - cinst winflexbison
   - win_flex --version
   - win_bison --version
