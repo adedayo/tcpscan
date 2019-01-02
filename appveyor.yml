@@ -50,6 +50,7 @@ build_script:
   - cd ..
   - go get ./...
   - go build github.com\adedayo\tcpscan\cmd\tcpscan
+  - dir
 
 
 # before_build:
