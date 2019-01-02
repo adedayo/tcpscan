@@ -61,7 +61,7 @@ build_script:
   - dir
 
 artifacts:
-  - path: '*.zip'
+  - path: 'tcpsan*.zip'
     name: zip-x64
 
 deploy:
