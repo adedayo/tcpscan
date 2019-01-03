@@ -46,7 +46,7 @@ build_script:
   - cd build
   # - cmake -DCMAKE_PREFIX_PATH=..\Win32\WpdPack -G"Visual Studio 12 2013" ..
   # - msbuild -nologo  pcap.sln
-  - cmake -DCMAKE_AR=ar.exe -DCMAKE_C_COMPILER=gcc.exe -DCMAKE_CXX_COMPILER=g++.exe -DCMAKE_MAKE_PROGRAM=make.exe -DCMAKE_PREFIX_PATH=..\libpcap -G"MSYS Makefiles" ..
+  - cmake -DCMAKE_AR=ar.exe -DCMAKE_C_COMPILER=gcc.exe -DCMAKE_CXX_COMPILER=g++.exe -DCMAKE_MAKE_PROGRAM=mingw32-make.exe -DCMAKE_PREFIX_PATH=..\libpcap -G"MSYS Makefiles" ..
   - msbuild /m /nologo /p:Configuration=Release pcap.sln
   # copy file to where cgo is expecting them to be, see https://github.com/google/gopacket/blob/c5b434497bea7a3417dc45b84c70282c4a5b3b3d/pcap/pcap.go
   - echo f | xcopy Release\pcap.exp C:\WpdPack\Lib\x64\wpcap.exp 
