@@ -8,6 +8,7 @@ environment:
   MYAPP: tcpscan
   VERSION: ${APPVEYOR_REPO_TAG_NAME}
   GOARCH: amd64
+  ARCH: x86_64
   matrix:
     - platform: x64
       configuration: Release
@@ -58,7 +59,7 @@ build_script:
   
   # - set PATH=C:\Program Files\go-msi\;%PATH% #go-msi path
   # - go-msi make --msi tcpscan-%VERSION%-%GOARCH%.msi --version %VERSION% --arch %GOARCH%
-  - 7z a %MYAPP%-%VERSION%-%GOARCH%.zip *.exe
+  - 7z a %MYAPP%-%VERSION%-Windows-%ARCH%.zip *.exe
   - dir
 
 artifacts:
