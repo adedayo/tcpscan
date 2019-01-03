@@ -61,13 +61,13 @@ build_script:
   - 7z a %MYAPP%-%VERSION%-%GOARCH%.zip *.exe
   - dir
 
-# artifacts:
-#   - path: 'tcpscan*.zip'
-#     name: zip-x64
+artifacts:
+  - path: 'tcpscan*.zip'
+    name: zip-x64
 
 deploy:
   - provider: GitHub
-    artifact: ${MYAPP}*.zip
+    artifact: zip-x64
     draft: false
     prerelease: false
     description: "Release ${VERSION}"
