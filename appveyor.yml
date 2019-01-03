@@ -7,7 +7,7 @@ clone_folder: c:\gopath\src\github.com\adedayo\tcpscan
 environment:
   MYAPP: tcpscan
   VERSION: ${APPVEYOR_REPO_TAG_NAME}
-  GOARC: amd64
+  GOARCH: amd64
   matrix:
     - platform: x64
       configuration: Release
@@ -67,7 +67,7 @@ build_script:
 
 deploy:
   - provider: GitHub
-    artifact: /tcpscan.*\.zip/
+    artifact: ${MYAPP}*.zip
     draft: false
     prerelease: false
     description: "Release ${VERSION}"
