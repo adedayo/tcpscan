@@ -54,7 +54,8 @@ build_script:
   - echo d | xcopy ..\pcap C:\WpdPack\Include\pcap # some files are expecting the headers under pcap directory
   - cd ..
   - go get ./...
-  - go build github.com\adedayo\tcpscan\cmd\tcpscan
+  - set BUILDFLAGS=-a -ldflags '-w -v -extldflags "/WHOLEARCHIVE"' #attempt to set static linker
+  - go build %BUILDFLAGS% github.com\adedayo\tcpscan\cmd\tcpscan
   - dir
   
   # - set PATH=C:\Program Files\go-msi\;%PATH% #go-msi path
