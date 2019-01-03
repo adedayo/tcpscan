@@ -5,6 +5,8 @@ image:
 clone_folder: c:\gopath\src\github.com\adedayo\tcpscan
 
 environment:
+  global:
+    CC: gcc.exe
   MYAPP: tcpscan
   VERSION: ${APPVEYOR_REPO_TAG_NAME}
   GOARCH: amd64
@@ -12,10 +14,10 @@ environment:
   matrix:
     - platform: x64
       configuration: Release
-      # GETH_ARCH: amd64
-      # MSYS2_ARCH: x86_64
-      # MSYS2_BITS: "64"
-      # MSYSTEM: MINGW64
+      GETH_ARCH: amd64
+      MSYS2_ARCH: x86_64
+      # MSYS2_BITS: 64
+      MSYSTEM: MINGW64
       PATH: C:\msys64\mingw64\bin\;C:\Program Files (x86)\NSIS\;%PATH% #make gcc available
 stack: go 1.11
 
@@ -44,7 +46,7 @@ build_script:
   - cd build
   # - cmake -DCMAKE_PREFIX_PATH=..\Win32\WpdPack -G"Visual Studio 12 2013" ..
   # - msbuild -nologo  pcap.sln
-  - cmake -DCMAKE_PREFIX_PATH=..\libpcap -G"Visual Studio 15 2017 Win64" ..
+  - cmake -DCMAKE_PREFIX_PATH=..\libpcap -G"MinGW Makefiles" ..
   - msbuild /m /nologo /p:Configuration=Release pcap.sln
   # copy file to where cgo is expecting them to be, see https://github.com/google/gopacket/blob/c5b434497bea7a3417dc45b84c70282c4a5b3b3d/pcap/pcap.go
   - echo f | xcopy Release\pcap.exp C:\WpdPack\Lib\x64\wpcap.exp 
@@ -54,7 +56,7 @@ build_script:
   - echo d | xcopy ..\pcap C:\WpdPack\Include\pcap # some files are expecting the headers under pcap directory
   - cd ..
   - go get ./...
-  - set BUILDFLAGS=-a -v -x -ldflags '-extldflags "/WHOLEARCHIVE"' #attempt to set static linker
+  - set BUILDFLAGS=-a -v -x -ldflags '-v -extldflags "-static"' #attempt to set static linker
   - go build %BUILDFLAGS% github.com\adedayo\tcpscan\cmd\tcpscan
   - dir
   
