@@ -18,7 +18,7 @@ environment:
       MSYS2_ARCH: x86_64
       # MSYS2_BITS: 64
       MSYSTEM: MINGW64
-      PATH: C:\msys64\mingw64\bin\;C:\Program Files (x86)\NSIS\;%PATH% #make gcc available
+      PATH: C:\msys64\mingw64\bin\;C:\msys64\;C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\;C:\Program Files (x86)\NSIS\;%PATH% #make gcc available
 stack: go 1.11
 
 platform: x64
