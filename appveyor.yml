@@ -62,7 +62,7 @@ build_script:
   - dir
 
 artifacts:
-  - path: 'tcpscan*.zip'
+  - path: libpcap\tcpscan*.zip
     name: zip-x64
 
 deploy:
