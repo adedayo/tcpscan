@@ -54,7 +54,7 @@ build_script:
   - echo d | xcopy ..\pcap C:\WpdPack\Include\pcap # some files are expecting the headers under pcap directory
   - cd ..
   - go get ./...
-  - set BUILDFLAGS=-a -ldflags '-w -v -extldflags "/WHOLEARCHIVE"' #attempt to set static linker
+  - set BUILDFLAGS=-a -v -x -ldflags '-v -extldflags "/WHOLEARCHIVE"' #attempt to set static linker
   - go build %BUILDFLAGS% github.com\adedayo\tcpscan\cmd\tcpscan
   - dir
   
