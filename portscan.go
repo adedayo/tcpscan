@@ -322,7 +322,7 @@ func determineRouterHardwareAddress(config ScanConfig) (net.HardwareAddr, error)
 	_, iface, err := getPreferredDevice(config)
 	bailout(err)
 	fmt.Printf("Got interface %#v\n", iface)
-	handle := getTimedHandle(fmt.Sprintf("host %s and ether dst %s", google, iface.HardwareAddr.String()), 5*time.Second, config)
+	handle := getTimedHandle(fmt.Sprintf("ether dst %s", iface.HardwareAddr.String()), 5*time.Second, config)
 	out := listenForEthernetPackets(handle)
 	go func() {
 		_, _ = net.DialTimeout("tcp", fmt.Sprintf("%s:443", google), 5*time.Second)
