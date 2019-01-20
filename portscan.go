@@ -343,10 +343,13 @@ func listenForEthernetPackets(handle *pcap.Handle) <-chan net.HardwareAddr {
 		decodedLayers := []gopacket.LayerType{}
 		packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 		for packet := range packetSource.Packets() {
+			fmt.Printf("Packet: %#v\n", packet)
 			parser.DecodeLayers(packet.Data(), &decodedLayers)
 			for _, lyr := range decodedLayers {
 				//Look for Ethernet frames
+				fmt.Printf("Decoded: %#v\n", lyr)
 				if lyr.Contains(layers.LayerTypeEthernet) {
+					println("Mac: ", eth.SrcMAC)
 					output <- eth.SrcMAC
 					break
 				}
