@@ -321,6 +321,7 @@ func determineRouterHardwareAddress(config ScanConfig) (net.HardwareAddr, error)
 	google := "www.google.com"
 	_, iface, err := getPreferredDevice(config)
 	bailout(err)
+	fmt.Printf("Got interface %#v\n", iface)
 	handle := getTimedHandle(fmt.Sprintf("host %s and ether dst %s", google, iface.HardwareAddr.String()), 5*time.Second, config)
 	out := listenForEthernetPackets(handle)
 	go func() {
@@ -337,6 +338,7 @@ func determineRouterHardwareAddress(config ScanConfig) (net.HardwareAddr, error)
 //listenForEthernetPackets collects packets on the network that meet port scan specifications
 func listenForEthernetPackets(handle *pcap.Handle) <-chan net.HardwareAddr {
 	output := make(chan net.HardwareAddr)
+	println("Listening for ethernet packets")
 	go func() {
 		var eth layers.Ethernet
 		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth)
