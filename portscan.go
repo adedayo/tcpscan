@@ -289,7 +289,7 @@ func sendSYNPacket(src, dst net.IP, srcPort, dstPrt int, route routeFinder, hand
 		TTL:        255,
 		Protocol:   layers.IPProtocolTCP,
 	}
-
+	// fmt.Printf("%#v", firstLayer)
 	timebuf := make([]byte, 8)
 	rand.Read(timebuf)
 	for i := 4; i < 8; i++ {
@@ -322,10 +322,11 @@ func determineRouterHardwareAddress(config ScanConfig) (net.HardwareAddr, error)
 	_, iface, err := getPreferredDevice(config)
 	bailout(err)
 	fmt.Printf("Got interface %#v\n", iface)
-	handle := getTimedHandle(fmt.Sprintf("ether dst %s", iface.HardwareAddr.String()), 5*time.Second, config)
+	handle := getTimedHandle(fmt.Sprintf("host %s and ether dst %s", google, iface.HardwareAddr.String()), 5*time.Second, config)
 	out := listenForEthernetPackets(handle)
 	go func() {
-		_, _ = net.DialTimeout("tcp", fmt.Sprintf("%s:443", google), 5*time.Second)
+		_, err = net.DialTimeout("tcp", fmt.Sprintf("%s:443", google), 5*time.Second)
+		bailout(err)
 	}()
 	select {
 	case hwAddress := <-out:
@@ -338,20 +339,19 @@ func determineRouterHardwareAddress(config ScanConfig) (net.HardwareAddr, error)
 //listenForEthernetPackets collects packets on the network that meet port scan specifications
 func listenForEthernetPackets(handle *pcap.Handle) <-chan net.HardwareAddr {
 	output := make(chan net.HardwareAddr)
-	println("Listening for ethernet packets")
 	go func() {
 		var eth layers.Ethernet
 		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth)
 		decodedLayers := []gopacket.LayerType{}
 		packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 		for packet := range packetSource.Packets() {
-			fmt.Printf("Packet: %#v\n", packet)
+			// fmt.Printf("Packet: %#v\n", packet)
 			parser.DecodeLayers(packet.Data(), &decodedLayers)
 			for _, lyr := range decodedLayers {
 				//Look for Ethernet frames
-				fmt.Printf("Decoded: %#v\n", lyr)
+				// fmt.Printf("Decoded: %#v\n", lyr)
 				if lyr.Contains(layers.LayerTypeEthernet) {
-					println("Mac: ", eth.SrcMAC)
+					// println("Mac: ", eth.SrcMAC)
 					output <- eth.SrcMAC
 					break
 				}
