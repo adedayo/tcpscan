@@ -341,13 +341,13 @@ func listenForEthernetPackets(handle *pcap.Handle) <-chan net.HardwareAddr {
 	output := make(chan net.HardwareAddr)
 	go func() {
 		var eth layers.Ethernet
-		var ip layers.IPv4
-		// parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth)
-		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeIPv4, &ip)
+		// var ip layers.IPv4
+		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth)
+		// parser := gopacket.NewDecodingLayerParser(layers.LayerTypeIPv4, &ip)
 		decodedLayers := []gopacket.LayerType{}
-		packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+		packetSource := gopacket.NewPacketSource(handle, nil)
 		for packet := range packetSource.Packets() {
-			fmt.Printf("Packet: %#v\n", packet)
+			// fmt.Printf("Packet: %#v\n", packet)
 			parser.DecodeLayers(packet.Data(), &decodedLayers)
 			for _, lyr := range decodedLayers {
 				//Look for Ethernet frames
