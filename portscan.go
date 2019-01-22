@@ -345,7 +345,7 @@ func listenForEthernetPackets(handle *pcap.Handle) <-chan net.HardwareAddr {
 		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth)
 		// parser := gopacket.NewDecodingLayerParser(layers.LayerTypeIPv4, &ip)
 		decodedLayers := []gopacket.LayerType{}
-		packetSource := gopacket.NewPacketSource(handle, nil)
+		packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 		for packet := range packetSource.Packets() {
 			// fmt.Printf("Packet: %#v\n", packet)
 			parser.DecodeLayers(packet.Data(), &decodedLayers)
@@ -553,7 +553,7 @@ func getIPv4InterfaceAddress(iface pcap.Interface) (pcap.InterfaceAddress, error
 func getTimedHandle(bpfFilter string, timeOut time.Duration, config ScanConfig) *pcap.Handle {
 	dev, _, err := getPreferredDevice(config)
 	bailout(err)
-	handle, err := pcap.OpenLive(dev.Name, 65535, false, timeOut)
+	handle, err := pcap.OpenLive(dev.Name, 65535, true, timeOut)
 	bailout(err)
 	handle.SetBPFFilter(bpfFilter)
 	return handle
