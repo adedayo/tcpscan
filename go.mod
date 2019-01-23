@@ -5,6 +5,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/go-cmp v0.2.0 // indirect
 	github.com/google/gopacket v1.1.15
+	github.com/jackpal/gateway v1.0.5
 	github.com/mdlayher/raw v0.0.0-20181016155347-fa5ef3332ca9 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stretchr/testify v1.2.2 // indirect
@@ -12,6 +13,7 @@ require (
 	github.com/urfave/cli v1.20.0
 	go.uber.org/atomic v1.3.2 // indirect
 	go.uber.org/ratelimit v0.0.0-20180316092928-c15da0234277
+	golang.org/x/arch v0.0.0-20181203225421-5a4828bb7045 // indirect
 	golang.org/x/net v0.0.0-20181029044818-c44066c5c816 // indirect
 	golang.org/x/sys v0.0.0-20181026203630-95b1ffbd15a5 // indirect
 )

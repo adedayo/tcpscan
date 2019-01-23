@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackpal/gateway"
+
 	"github.com/adedayo/cidr"
 
 	"github.com/google/gopacket"
@@ -318,10 +320,12 @@ func sendSYNPacket(src, dst net.IP, srcPort, dstPrt int, route routeFinder, hand
 
 //determineRouterHardwareAddress finds the router by looking at the ethernet frames that returns the TCP ACK handshake from "google"
 func determineRouterHardwareAddress(config ScanConfig) (net.HardwareAddr, error) {
+	outAlt := alternativeGatewayHWDiscovery(config)
 	google := "www.google.com"
 	_, iface, err := getPreferredDevice(config)
 	bailout(err)
-	fmt.Printf("Got interface %#v\n", iface)
+	// adds, _ := iface.Addrs()
+	// fmt.Printf("Got interface %#v, %s\n", iface, adds[1].String())
 	handle := getTimedHandle(fmt.Sprintf("host %s and ether dst %s", google, iface.HardwareAddr.String()), 5*time.Second, config)
 	out := listenForEthernetPackets(handle)
 	go func() {
@@ -329,10 +333,79 @@ func determineRouterHardwareAddress(config ScanConfig) (net.HardwareAddr, error)
 		bailout(err)
 	}()
 	select {
-	case hwAddress := <-out:
+	case hwAddress := <-out: //found via TCP connect
 		return hwAddress, nil
-	case <-time.After(5 * time.Second):
+	case hwAddress := <-outAlt: //found via ARP
+		return hwAddress, nil
+	case <-time.After(30 * time.Second):
 		return nil, errors.New("Timeout error: could not determine the router hardware address in time")
+	}
+}
+
+func alternativeGatewayHWDiscovery(config ScanConfig) <-chan net.HardwareAddr {
+	dev, iface, err := getPreferredDevice(config)
+	bailout(err)
+	var srcIP net.IP
+	for _, add := range dev.Addresses {
+		if !add.IP.IsLoopback() && add.IP.To4() != nil {
+			srcIP = add.IP
+			break
+		}
+	}
+	dstIP, err := gateway.DiscoverGateway()
+	if err != nil {
+		bailout(err)
+	}
+	handle, err := pcap.OpenLive(dev.Name, 65536, true, 20*time.Second)
+	if err != nil {
+		bailout(err)
+	}
+	out := readARP(handle, &iface, dstIP)
+	writeArp(handle, &iface, srcIP, dstIP)
+	return out
+}
+
+func readARP(handle *pcap.Handle, iface *net.Interface, dstIP []byte) <-chan net.HardwareAddr {
+	packetSource := gopacket.NewPacketSource(handle, layers.LayerTypeEthernet)
+	output := make(chan net.HardwareAddr)
+	targetIP := net.IP(dstIP)
+	go func() {
+		for packet := range packetSource.Packets() {
+			if arpLayer := packet.Layer(layers.LayerTypeARP); arpLayer != nil {
+				arp := arpLayer.(*layers.ARP)
+				if srcIP := net.IP(arp.SourceProtAddress); arp != nil && srcIP.Equal(targetIP) {
+					out := net.HardwareAddr(arp.SourceHwAddress)
+					// println("QQ", out.String(), srcIP.String(), arp.Operation, net.IP(dstIP).String())
+					output <- out
+				}
+			}
+		}
+		close(output)
+	}()
+	return output
+}
+
+func writeArp(handle *pcap.Handle, srcIFace *net.Interface, srcIP, dstIP net.IP) {
+	eth := layers.Ethernet{
+		SrcMAC:       srcIFace.HardwareAddr,
+		DstMAC:       net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		EthernetType: layers.EthernetTypeARP,
+	}
+	arp := layers.ARP{
+		Operation:         layers.ARPRequest,
+		AddrType:          layers.LinkTypeEthernet,
+		Protocol:          layers.EthernetTypeIPv4,
+		HwAddressSize:     6,
+		ProtAddressSize:   4,
+		SourceHwAddress:   []byte(srcIFace.HardwareAddr),
+		SourceProtAddress: []byte(srcIP),
+		DstHwAddress:      []byte{0, 0, 0, 0, 0, 0},
+		DstProtAddress:    []byte(dstIP),
+	}
+	buf := gopacket.NewSerializeBuffer()
+	gopacket.SerializeLayers(buf, options, &eth, &arp)
+	if err := handle.WritePacketData(buf.Bytes()); err != nil {
+		bailout(err)
 	}
 }
 
