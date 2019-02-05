@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	mathrand "math/rand"
 	"net"
 	"os"
@@ -482,20 +481,20 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	go func() {
-		for {
-			packet, err := packetSource.NextPacket()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				if err.Error() == pcap.NextErrorTimeoutExpired.Error() {
-					continue
-				}
-				//  else {
-				// 	// some other error, will be useful for debugging
-				// 	println(err.Error())
-				// }
-			}
+		for packet := range packetSource.Packets() {
+			// packet, err := packetSource.NextPacket()
+			// if err == io.EOF {
+			// 	break
+			// }
+			// if err != nil {
+			// 	if err.Error() == pcap.NextErrorTimeoutExpired.Error() {
+			// 		continue
+			// 	}
+			// 	//  else {
+			// 	// 	// some other error, will be useful for debugging
+			// 	// 	println(err.Error())
+			// 	// }
+			// }
 			parser.DecodeLayers(packet.Data(), &decodedLayers)
 			for _, lyr := range decodedLayers {
 				//Look for TCP ACK
@@ -627,7 +626,7 @@ func getIPv4InterfaceAddress(iface pcap.Interface) (pcap.InterfaceAddress, error
 func getTimedHandle(bpfFilter string, timeOut time.Duration, config ScanConfig) *pcap.Handle {
 	dev, _, err := getPreferredDevice(config)
 	bailout(err)
-	handle, err := pcap.OpenLive(dev.Name, 65535, true, timeOut)
+	handle, err := pcap.OpenLive(dev.Name, 65535, false, timeOut)
 	bailout(err)
 	handle.SetBPFFilter(bpfFilter)
 	return handle
@@ -636,7 +635,7 @@ func getTimedHandle(bpfFilter string, timeOut time.Duration, config ScanConfig) 
 func getHandle(bpfFilter string, config ScanConfig) *pcap.Handle {
 	dev, _, err := getPreferredDevice(config)
 	bailout(err)
-	handle, err := pcap.OpenLive(dev.Name, 65535, true, pcap.BlockForever)
+	handle, err := pcap.OpenLive(dev.Name, 65535, false, pcap.BlockForever)
 	bailout(err)
 	handle.SetBPFFilter(bpfFilter)
 	return handle
