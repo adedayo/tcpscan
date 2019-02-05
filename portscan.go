@@ -497,16 +497,16 @@ func listenForACKPackets(handle *pcap.Handle, cidrs []string, route routeFinder,
 		for {
 			packet, err := packetSource.NextPacket()
 			if err == io.EOF {
+				println("EOF")
 				break
 			}
 			if err != nil {
 				if err.Error() == pcap.NextErrorTimeoutExpired.Error() {
 					continue
+				} else {
+					// some other error, will be useful for debugging
+					println("Some other error: ", err.Error())
 				}
-				//  else {
-				// 	// some other error, will be useful for debugging
-				// 	println(err.Error())
-				// }
 			}
 			parser.DecodeLayers(packet.Data(), &decodedLayers)
 			for _, lyr := range decodedLayers {
