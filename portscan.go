@@ -146,6 +146,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 						// Send a specified number of SYN packets
 						for i := 0; i < count; i++ {
 							rl.Take()
+							fmt.Printf("Sending to IP %s and port %d\n", dstIP, dstPort)
 							err := sendSYNPacket(route.SrcIP, dst, sourcePort, dstPort, route, writeHandle)
 							bailout(err)
 							sourcePort++
@@ -504,6 +505,7 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 						SYN:  tcp.SYN,
 						RST:  tcp.RST,
 					}
+					fmt.Printf("Got ACK %#v\n", ack)
 					output <- ack
 					if !config.Quiet && ack.IsOpen() {
 						fmt.Printf("%s:%s (%s) is %s\n", ack.Host, ack.Port, ack.GetServiceName(), ack.Status())
