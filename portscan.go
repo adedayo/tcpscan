@@ -122,6 +122,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 	}
 	//restrict filtering to the specified CIDR IPs and listen for inbound ACK packets
 	filter := fmt.Sprintf(`(%s) and not src host %s`, strings.Join(cidrXs, " or "), route.SrcIP.String())
+	println("Filter ", filter)
 	handle := getHandle(filter, config)
 	out := listenForACKPackets(handle, route, config)
 
@@ -146,7 +147,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 						// Send a specified number of SYN packets
 						for i := 0; i < count; i++ {
 							rl.Take()
-							fmt.Printf("Sending to IP %s and port %d\n", dstIP, dstPort)
+							// fmt.Printf("Sending to IP %s and port %d\n", dstIP, dstPort)
 							err := sendSYNPacket(route.SrcIP, dst, sourcePort, dstPort, route, writeHandle)
 							bailout(err)
 							sourcePort++
@@ -635,7 +636,7 @@ func getTimedHandle(bpfFilter string, timeOut time.Duration, config ScanConfig) 
 func getHandle(bpfFilter string, config ScanConfig) *pcap.Handle {
 	dev, _, err := getPreferredDevice(config)
 	bailout(err)
-	handle, err := pcap.OpenLive(dev.Name, 65535, false, pcap.BlockForever)
+	handle, err := pcap.OpenLive(dev.Name, 65535, true, pcap.BlockForever)
 	bailout(err)
 	handle.SetBPFFilter(bpfFilter)
 	return handle
