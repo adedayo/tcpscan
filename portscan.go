@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	mathrand "math/rand"
 	"net"
 	"os"
@@ -481,20 +482,21 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	go func() {
-		for packet := range packetSource.Packets() {
-			// packet, err := packetSource.NextPacket()
-			// if err == io.EOF {
-			// 	break
-			// }
-			// if err != nil {
-			// 	if err.Error() == pcap.NextErrorTimeoutExpired.Error() {
-			// 		continue
-			// 	}
-			// 	//  else {
-			// 	// 	// some other error, will be useful for debugging
-			// 	// 	println(err.Error())
-			// 	// }
-			// }
+		for {
+			packet, err := packetSource.NextPacket()
+			println("got packet")
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				if err.Error() == pcap.NextErrorTimeoutExpired.Error() {
+					continue
+				}
+				//  else {
+				// 	// some other error, will be useful for debugging
+				// 	println(err.Error())
+				// }
+			}
 			parser.DecodeLayers(packet.Data(), &decodedLayers)
 			for _, lyr := range decodedLayers {
 				//Look for TCP ACK
