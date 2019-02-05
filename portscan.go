@@ -93,6 +93,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 	}
 	rl := ratelimit.New(rate) //ratelimit number of packets per second
 	route := getRoute(config)
+	fmt.Printf("Got route %#v\n", route)
 	cidrXs := []string{}
 	cidrPortMap := make(map[string][]int)
 	for _, cidrX := range cidrAddresses {
@@ -324,8 +325,6 @@ func determineRouterHardwareAddress(config ScanConfig) (net.HardwareAddr, error)
 	google := "www.google.com"
 	_, iface, err := getPreferredDevice(config)
 	bailout(err)
-	// adds, _ := iface.Addrs()
-	// fmt.Printf("Got interface %#v, %s\n", iface, adds[1].String())
 	handle := getTimedHandle(fmt.Sprintf("host %s and ether dst %s", google, iface.HardwareAddr.String()), 5*time.Second, config)
 	out := listenForEthernetPackets(handle)
 	go func() {
@@ -375,7 +374,6 @@ func readARP(handle *pcap.Handle, iface *net.Interface, dstIP []byte) <-chan net
 				arp := arpLayer.(*layers.ARP)
 				if srcIP := net.IP(arp.SourceProtAddress); arp != nil && srcIP.Equal(targetIP) {
 					out := net.HardwareAddr(arp.SourceHwAddress)
-					// println("QQ", out.String(), srcIP.String(), arp.Operation, net.IP(dstIP).String())
 					output <- out
 				}
 			}
