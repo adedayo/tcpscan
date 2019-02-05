@@ -94,7 +94,6 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 	rl := ratelimit.New(rate) //ratelimit number of packets per second
 	route := getRoute(config)
 	fmt.Printf("Got route %#v\n", route)
-	cidrXs := []string{}
 	cidrPortMap := make(map[string][]int)
 	for _, cidrX := range cidrAddresses {
 		ports := []int{}
@@ -117,14 +116,20 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 			cidrPortMap[cidrX] = append(currentPorts, ports...)
 		}
 	}
+	cidrXs := []string{}
+	// for cidrX := range cidrPortMap {
+	// 	cidrXs = append(cidrXs, "net "+cidrX)
+	// }
+
 	for cidrX := range cidrPortMap {
-		cidrXs = append(cidrXs, "net "+cidrX)
+		cidrXs = append(cidrXs, cidrX)
 	}
 	//restrict filtering to the specified CIDR IPs and listen for inbound ACK packets
-	filter := fmt.Sprintf(`(%s) and not src host %s`, strings.Join(cidrXs, " or "), route.SrcIP.String())
+	// filter := fmt.Sprintf(`(%s) and not src host %s`, strings.Join(cidrXs, " or "), route.SrcIP.String())
+	filter := fmt.Sprintf(`not src host %s`, route.SrcIP.String())
 	println("Filter ", filter)
 	handle := getHandle(filter, config)
-	out := listenForACKPackets(handle, route, config)
+	out := listenForACKPackets(handle, cidrXs, route, config)
 
 	go func() {
 
@@ -465,7 +470,13 @@ func (ppp *MyPPP) NextLayerType() gopacket.LayerType {
 }
 
 //listenForACKPackets collects packets on the network that meet port scan specifications
-func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConfig) <-chan PortACK {
+func listenForACKPackets(handle *pcap.Handle, cidrs []string, route routeFinder, config ScanConfig) <-chan PortACK {
+	target := make(map[string]bool)
+	for _, c := range cidrs {
+		for _, ip := range cidr.Expand(c) {
+			target[ip] = true
+		}
+	}
 	output := make(chan PortACK)
 	var ip layers.IPv4
 	var tcp layers.TCP
@@ -482,9 +493,9 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	go func() {
+		println("About to start listening for packets")
 		for {
 			packet, err := packetSource.NextPacket()
-			println("got packet")
 			if err == io.EOF {
 				break
 			}
@@ -500,19 +511,22 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 			parser.DecodeLayers(packet.Data(), &decodedLayers)
 			for _, lyr := range decodedLayers {
 				//Look for TCP ACK
-				if lyr.Contains(layers.LayerTypeTCP) {
-					ack := PortACK{
-						Host: ip.SrcIP.String(),
-						Port: strings.Split(tcp.SrcPort.String(), "(")[0],
-						SYN:  tcp.SYN,
-						RST:  tcp.RST,
+				if ipAddress := ip.SrcIP.String(); target[ipAddress] {
+					println(ipAddress, tcp.SYN, tcp.RST, tcp.ACK)
+					if lyr.Contains(layers.LayerTypeTCP) {
+						ack := PortACK{
+							Host: ip.SrcIP.String(),
+							Port: strings.Split(tcp.SrcPort.String(), "(")[0],
+							SYN:  tcp.SYN,
+							RST:  tcp.RST,
+						}
+						fmt.Printf("Got ACK = %t  %#v\n", tcp.ACK, ack)
+						output <- ack
+						if !config.Quiet && ack.IsOpen() {
+							fmt.Printf("%s:%s (%s) is %s\n", ack.Host, ack.Port, ack.GetServiceName(), ack.Status())
+						}
+						break
 					}
-					fmt.Printf("Got ACK %#v\n", ack)
-					output <- ack
-					if !config.Quiet && ack.IsOpen() {
-						fmt.Printf("%s:%s (%s) is %s\n", ack.Host, ack.Port, ack.GetServiceName(), ack.Status())
-					}
-					break
 				}
 			}
 		}
