@@ -653,6 +653,6 @@ func getHandle(bpfFilter string, config ScanConfig) *pcap.Handle {
 	bailout(err)
 	handle, err := pcap.OpenLive(dev.Name, 65535, false, pcap.BlockForever)
 	bailout(err)
-	handle.SetBPFFilter(bpfFilter)
+	// handle.SetBPFFilter(bpfFilter)
 	return handle
 }
