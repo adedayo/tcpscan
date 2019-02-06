@@ -17,7 +17,7 @@ func closeHandle(handle *pcap.Handle) {
 func getHandle(bpfFilter string, config ScanConfig) *pcap.Handle {
 	dev, _, err := getPreferredDevice(config)
 	bailout(err)
-	handle, err := pcap.OpenLive(dev.Name, 65535, false, 20*time.Day) //some arbitrarily long time
+	handle, err := pcap.OpenLive(dev.Name, 65535, false, 480*time.Hour) //some arbitrarily long time
 	bailout(err)
 	handle.SetBPFFilter(bpfFilter)
 	return handle
