@@ -162,8 +162,8 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 		select {
 		case <-time.After(timeout):
 			println("Closing handle ...")
-			handle.Close()
-			println("Handle cloded")
+			go handle.Close()
+			println("Handle closed")
 		}
 	}()
 	return out
