@@ -122,7 +122,9 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 
 	//restrict filtering to the specified CIDR IPs and listen for inbound ACK packets
 	filter := fmt.Sprintf(`(%s) and not src host %s`, strings.Join(cidrXs, " or "), route.SrcIP.String())
-	handle := getHandle(filter, config)
+	timeout := time.Duration(config.Timeout) * time.Second
+
+	handle := getTimedHandle(filter, timeout, config)
 	out := listenForACKPackets(handle, route, config)
 
 	go func() {
@@ -158,11 +160,10 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 				writeHandle.Close()
 			}(ipAdds, cidrPorts)
 		}
-		timeout := time.Duration(config.Timeout) * time.Second
 		select {
 		case <-time.After(timeout):
 			println("Closing handle ...")
-			defer handle.Close()
+			handle.Close()
 			println("Handle closed - returning out of goroutine")
 		}
 	}()
