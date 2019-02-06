@@ -1,6 +1,7 @@
 package portscan
 
 import (
+	"os"
 	"github.com/google/gopacket/pcap"
 )
 
