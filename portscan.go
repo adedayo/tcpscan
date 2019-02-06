@@ -161,7 +161,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 		timeout := time.Duration(config.Timeout) * time.Second
 		select {
 		case <-time.After(timeout):
-			closeHandle(handle)
+			closeHandle(handle, config)
 		}
 	}()
 	return out

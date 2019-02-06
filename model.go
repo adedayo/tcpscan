@@ -20,6 +20,8 @@ type ScanConfig struct {
 	Quiet bool
 	//If not empty, indicates which network interface to use, bypassing automated guessing
 	Interface string
+	//used to indicate whether this is being used as a command line tool, a hack to deal with a Linux issue with pcap.OpenLive
+	CommandLine bool
 }
 
 //PortACK describes a port with an ACK after a TCP SYN request

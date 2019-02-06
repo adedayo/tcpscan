@@ -97,6 +97,7 @@ func process(c *cli.Context) error {
 		PacketsPerSecond: c.Int("rate"),
 		Quiet:            c.Bool("quiet"),
 		Interface:        c.String("interface"),
+		CommandLine:      true,
 	}
 	for ack := range portscan.ScanCIDR(config, args...) {
 		key := ack.Host + ack.Port

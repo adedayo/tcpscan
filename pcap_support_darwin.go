@@ -4,7 +4,7 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-func closeHandle(handle *pcap.Handle) {
+func closeHandle(handle *pcap.Handle, config ScanConfig) {
 	handle.Close()
 }
 
