@@ -161,9 +161,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 		timeout := time.Duration(config.Timeout) * time.Second
 		select {
 		case <-time.After(timeout):
-			println("Closing handle ...")
 			closeHandle(handle)
-			println("Handle closed - returning out of goroutine")
 		}
 	}()
 	return out
@@ -623,15 +621,6 @@ func getTimedHandle(bpfFilter string, timeOut time.Duration, config ScanConfig) 
 	dev, _, err := getPreferredDevice(config)
 	bailout(err)
 	handle, err := pcap.OpenLive(dev.Name, 65535, false, timeOut)
-	bailout(err)
-	handle.SetBPFFilter(bpfFilter)
-	return handle
-}
-
-func getHandle(bpfFilter string, config ScanConfig) *pcap.Handle {
-	dev, _, err := getPreferredDevice(config)
-	bailout(err)
-	handle, err := pcap.OpenLive(dev.Name, 65535, false, pcap.BlockForever)
 	bailout(err)
 	handle.SetBPFFilter(bpfFilter)
 	return handle
