@@ -126,7 +126,6 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 	out := listenForACKPackets(handle, route, config)
 
 	go func() {
-
 		for cidrX, cidrPorts := range cidrPortMap {
 			ipAdds := cidr.Expand(cidrX)
 			//shuffle the IP addresses pseudo-randomly
@@ -162,7 +161,9 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 		timeout := time.Duration(config.Timeout) * time.Second
 		select {
 		case <-time.After(timeout):
+			println("Closing handle ...")
 			handle.Close()
+			println("Handle cloded")
 		}
 	}()
 	return out
