@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/adedayo/cidr"
-	"github.com/adedayo/tcpscan"
+	portscan "github.com/adedayo/tcpscan"
 	"github.com/urfave/cli"
 )
 
