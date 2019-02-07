@@ -24,6 +24,7 @@ func closeHandle(handle *pcap.Handle, config ScanConfig) {
 	go handle.Close()
 
 	go func() {
+		println("Sending data out")
 		_, err := net.DialTimeout("tcp", fmt.Sprintf("%s:443", "8.8.8.8"), 5*time.Second)
 		bailout(err)
 	}()
