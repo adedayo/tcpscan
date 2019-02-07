@@ -1,6 +1,10 @@
 package portscan
 
 import (
+	"fmt"
+	"net"
+	"time"
+
 	"github.com/google/gopacket/pcap"
 )
 
@@ -17,8 +21,12 @@ func closeHandle(handle *pcap.Handle, config ScanConfig) {
 	// //do nothing :-(
 	// pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
 
-	handle.Close()
+	go handle.Close()
 
+	go func() {
+		_, err = net.DialTimeout("tcp", fmt.Sprintf("%s:443", "8.8.8.8"), 5*time.Second)
+		bailout(err)
+	}()
 	// println("After close")
 	// pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
 }
