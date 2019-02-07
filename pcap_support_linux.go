@@ -8,26 +8,11 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-func getHandle(bpfFilter string, config ScanConfig) *pcap.Handle {
-	dev, _, err := getPreferredDevice(config)
-	bailout(err)
-	handle, err := pcap.OpenLive(dev.Name, 65535, false, pcap.BlockForever)
-	bailout(err)
-	handle.SetBPFFilter(bpfFilter)
-	return handle
-}
-
-func closeHandle(handle *pcap.Handle, config ScanConfig) {
-	// //do nothing :-(
-	// pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
-
+func closeHandle(handle *pcap.Handle, connectHost string, config ScanConfig) {
 	go handle.Close()
-
 	go func() {
-		println("Sending data out")
-		_, err := net.DialTimeout("tcp", fmt.Sprintf("%s:443", "8.8.8.8"), 5*time.Second)
-		bailout(err)
+		//dial an arbitrary port to generate packet to ensure the handle closes - some weirdness on Linux versions using TPACKET_V3
+		//see https://github.com/tsg/gopacket/pull/15 and https://github.com/elastic/beats/issues/6535
+		net.DialTimeout("tcp", fmt.Sprintf("%s:443", connectHost), time.Second)
 	}()
-	// println("After close")
-	// pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
 }

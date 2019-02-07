@@ -126,12 +126,14 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 	out := listenForACKPackets(handle, route, config)
 
 	go func() {
+		sampleIP := ""
 		for cidrX, cidrPorts := range cidrPortMap {
 			ipAdds := cidr.Expand(cidrX)
 			//shuffle the IP addresses pseudo-randomly
 			mathrand.Shuffle(len(ipAdds), func(i, j int) {
 				ipAdds[i], ipAdds[j] = ipAdds[j], ipAdds[i]
 			})
+			sampleIP = ipAdds[0]
 
 			count := 1 //Number of SYN packets to send per port (make this a parameter)
 			//Send SYN packets asynchronously
@@ -161,7 +163,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 		timeout := time.Duration(config.Timeout) * time.Second
 		select {
 		case <-time.After(timeout):
-			closeHandle(handle, config)
+			closeHandle(handle, sampleIP, config)
 		}
 	}()
 	return out
@@ -621,6 +623,15 @@ func getTimedHandle(bpfFilter string, timeOut time.Duration, config ScanConfig) 
 	dev, _, err := getPreferredDevice(config)
 	bailout(err)
 	handle, err := pcap.OpenLive(dev.Name, 65535, false, timeOut)
+	bailout(err)
+	handle.SetBPFFilter(bpfFilter)
+	return handle
+}
+
+func getHandle(bpfFilter string, config ScanConfig) *pcap.Handle {
+	dev, _, err := getPreferredDevice(config)
+	bailout(err)
+	handle, err := pcap.OpenLive(dev.Name, 65535, false, pcap.BlockForever)
 	bailout(err)
 	handle.SetBPFFilter(bpfFilter)
 	return handle
