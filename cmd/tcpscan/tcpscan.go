@@ -123,7 +123,6 @@ func process(c *cli.Context) error {
 		hosts = append(hosts, cidr.Expand(h)...)
 	}
 	fmt.Printf("Scanned %d hosts in %f seconds\n", len(hosts), time.Since(t).Seconds())
-	portscan.CommandLineExit(config)
 	return nil
 }
 

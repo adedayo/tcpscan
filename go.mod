@@ -4,7 +4,7 @@ require (
 	github.com/adedayo/cidr v0.1.3
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/go-cmp v0.2.0 // indirect
-	github.com/google/gopacket v1.1.15
+	github.com/google/gopacket v1.1.16
 	github.com/jackpal/gateway v1.0.5
 	github.com/mdlayher/raw v0.0.0-20181016155347-fa5ef3332ca9 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
