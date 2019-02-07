@@ -19,11 +19,15 @@ func closeHandle(handle *pcap.Handle, config ScanConfig) {
 	// //do nothing :-(
 	// pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
 
-	if config.CommandLine {
-		os.Exit(0)
-	}
 	// handle.Close()
 
 	// println("After close")
 	// pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
+}
+
+//CommandLineExit - exit hack for Linux command line
+func CommandLineExit(config ScanConfig) {
+	if config.CommandLine {
+		os.Exit(0)
+	}
 }

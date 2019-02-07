@@ -16,3 +16,8 @@ func getHandle(bpfFilter string, config ScanConfig) *pcap.Handle {
 	handle.SetBPFFilter(bpfFilter)
 	return handle
 }
+
+//CommandLineExit - exit hack for Linux command line
+func CommandLineExit(config ScanConfig) {
+	//do noting on darwin
+}
