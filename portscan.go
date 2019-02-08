@@ -482,6 +482,7 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	go func() {
+		defer close(output)
 		for {
 			packet, err := packetSource.NextPacket()
 			if err == io.EOF {
@@ -510,7 +511,6 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 				}
 			}
 		}
-		close(output)
 	}()
 	return output
 }
