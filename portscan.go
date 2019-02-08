@@ -139,10 +139,16 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 			//Send SYN packets asynchronously
 			go func(ips []string, ports []int) { // run the scans in parallel
 				writeHandle := getHandle(filter, config)
+				defer func() {
+					println("Closing writehandle")
+					writeHandle.Close()
+					println("Closed writehandle")
+				}()
 				stopPort := 65535
 				sourcePort := 50000
 				for _, dstPort := range ports {
 					for _, dstIP := range ips {
+						fmt.Printf("Processing %s:%d\n", dstIP, dstPort)
 						dst := net.ParseIP(dstIP)
 						// Send a specified number of SYN packets
 						for i := 0; i < count; i++ {
@@ -157,11 +163,10 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 						}
 					}
 				}
-				println("Closing writehandle")
-				writeHandle.Close()
-				println("Closed writehandle")
+
 			}(ipAdds, cidrPorts)
 		}
+		println("Out of the loop")
 		timeout := time.Duration(config.Timeout) * time.Second
 		select {
 		case <-time.After(timeout):
