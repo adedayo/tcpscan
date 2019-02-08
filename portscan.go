@@ -482,10 +482,15 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	go func() {
-		defer close(output)
+		defer func() {
+			println("closing the output")
+			close(output)
+			println("output closed")
+		}()
 		for {
 			packet, err := packetSource.NextPacket()
 			if err == io.EOF {
+				println("EOF")
 				break
 			}
 			if err != nil {
