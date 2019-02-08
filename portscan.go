@@ -126,6 +126,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 	out := listenForACKPackets(handle, route, config)
 
 	go func() {
+		println("SCanCIDR goroutine")
 		sampleIP := ""
 		for cidrX, cidrPorts := range cidrPortMap {
 			ipAdds := cidr.Expand(cidrX)
@@ -138,6 +139,8 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 			count := 1 //Number of SYN packets to send per port (make this a parameter)
 			//Send SYN packets asynchronously
 			go func(ips []string, ports []int) { // run the scans in parallel
+				println("SCanCIDR INNER goroutine")
+
 				writeHandle := getHandle(filter, config)
 				defer func() {
 					println("Closing writehandle")
@@ -474,6 +477,7 @@ func (ppp *MyPPP) NextLayerType() gopacket.LayerType {
 
 //listenForACKPackets collects packets on the network that meet port scan specifications
 func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConfig) <-chan PortACK {
+	println("listening for ACK packet")
 	output := make(chan PortACK)
 	var ip layers.IPv4
 	var tcp layers.TCP
@@ -490,24 +494,29 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	go func() {
+		println("In packet listening goroutine")
 		defer func() {
 			println("closing the output")
 			close(output)
 			println("output closed")
 		}()
 		for {
+			println("Listening for packet")
 			packet, err := packetSource.NextPacket()
+			println("Got a packet")
 			if err == io.EOF {
 				println("EOF")
 				break
 			}
 			if err != nil {
 				if err.Error() == pcap.NextErrorTimeoutExpired.Error() {
+					println("Timeout error")
 					continue
 				}
 			}
 			parser.DecodeLayers(packet.Data(), &decodedLayers)
 			for _, lyr := range decodedLayers {
+				println("Layer ", lyr.String())
 				//Look for TCP ACK
 				if lyr.Contains(layers.LayerTypeTCP) {
 					ack := PortACK{
