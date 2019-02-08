@@ -157,12 +157,15 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 						}
 					}
 				}
+				println("Closing writehandle")
 				writeHandle.Close()
+				println("Closed writehandle")
 			}(ipAdds, cidrPorts)
 		}
 		timeout := time.Duration(config.Timeout) * time.Second
 		select {
 		case <-time.After(timeout):
+			println("timing out with IP", sampleIP)
 			closeHandle(handle, sampleIP, config)
 		}
 	}()
