@@ -128,8 +128,6 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 	out := listenForACKPackets(handle, route, config, stop)
 
 	go func() {
-		defer close(stop)
-
 		println("SCanCIDR goroutine")
 		sampleIP := ""
 		for cidrX, cidrPorts := range cidrPortMap {
@@ -481,7 +479,7 @@ func (ppp *MyPPP) NextLayerType() gopacket.LayerType {
 }
 
 //listenForACKPackets collects packets on the network that meet port scan specifications
-func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConfig, stop <-chan bool) <-chan PortACK {
+func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConfig, stop chan bool) <-chan PortACK {
 	println("listening for ACK packet")
 	output := make(chan PortACK)
 	var ip layers.IPv4
@@ -511,6 +509,7 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 			case <-stop:
 				println("Got stop signal")
 				x = false
+				close(stop)
 				return
 			default:
 
