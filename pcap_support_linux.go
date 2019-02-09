@@ -23,8 +23,6 @@ func closeHandle(handle *pcap.Handle, connectHost string, config ScanConfig, sto
 		println("XXX sent packet to ", connectHost)
 
 		stop <- true
-		close(stop)
-
 		println("sent stop signal")
 
 	}()

@@ -7,5 +7,4 @@ import (
 func closeHandle(handle *pcap.Handle, host string, config ScanConfig, stop chan bool) {
 	handle.Close()
 	stop <- true
-	close(stop)
 }

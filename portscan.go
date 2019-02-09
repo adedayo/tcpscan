@@ -176,6 +176,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 			println("timing out with IP", sampleIP)
 			closeHandle(handle, sampleIP, config, stop)
 		}
+		close(stop)
 	}()
 	println("Finished ScanCIDR")
 	return out
