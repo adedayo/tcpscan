@@ -177,7 +177,8 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 			println("timing out with IP", sampleIP)
 			closeHandle(handle, sampleIP, config, stop)
 		}
-
+		println("Out of SELECT-CASE")
+		return
 	}()
 	println("Finished ScanCIDR")
 	return out
@@ -510,9 +511,9 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 				println("Got stop signal")
 				x = false
 				close(stop)
+				println("Closed STOP channel")
 				return
 			default:
-
 				println("Listening for packet")
 				packet, err := packetSource.NextPacket()
 				println("Got a packet")
@@ -545,6 +546,7 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 						break
 					}
 				}
+				println("end of default select")
 			}
 		}
 		println("out for FOR loop")
@@ -668,7 +670,7 @@ func getTimedHandle(bpfFilter string, timeOut time.Duration, config ScanConfig) 
 func getHandle(bpfFilter string, config ScanConfig) *pcap.Handle {
 	dev, _, err := getPreferredDevice(config)
 	bailout(err)
-	handle, err := pcap.OpenLive(dev.Name, 65535, true, pcap.BlockForever)
+	handle, err := pcap.OpenLive(dev.Name, 65535, false, pcap.BlockForever)
 	bailout(err)
 	handle.SetBPFFilter(bpfFilter)
 	return handle
