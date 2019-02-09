@@ -8,7 +8,7 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-func closeHandle(handle *pcap.Handle, connectHost string, config ScanConfig) {
+func closeHandle(handle *pcap.Handle, connectHost string, config ScanConfig, stop chan bool) {
 	println("closing handle", connectHost)
 	go handle.Close()
 	println("closing handle 2", connectHost)
@@ -21,6 +21,11 @@ func closeHandle(handle *pcap.Handle, connectHost string, config ScanConfig) {
 		net.DialTimeout("tcp", fmt.Sprintf("%s:443", connectHost), time.Second)
 
 		println("XXX sent packet to ", connectHost)
+
+		stop <- true
+		close(stop)
+
+		println("sent stop signal")
 
 	}()
 }

@@ -123,7 +123,8 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 	//restrict filtering to the specified CIDR IPs and listen for inbound ACK packets
 	filter := fmt.Sprintf(`(%s) and not src host %s`, strings.Join(cidrXs, " or "), route.SrcIP.String())
 	handle := getHandle(filter, config)
-	out := listenForACKPackets(handle, route, config)
+	stop := make(chan bool)
+	out := listenForACKPackets(handle, route, config, stop)
 
 	go func() {
 		println("SCanCIDR goroutine")
@@ -173,9 +174,10 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 		select {
 		case <-time.After(timeout):
 			println("timing out with IP", sampleIP)
-			closeHandle(handle, sampleIP, config)
+			closeHandle(handle, sampleIP, config, stop)
 		}
 	}()
+	println("Finished ScanCIDR")
 	return out
 }
 
@@ -475,7 +477,7 @@ func (ppp *MyPPP) NextLayerType() gopacket.LayerType {
 }
 
 //listenForACKPackets collects packets on the network that meet port scan specifications
-func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConfig) <-chan PortACK {
+func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConfig, stop <-chan bool) <-chan PortACK {
 	println("listening for ACK packet")
 	output := make(chan PortACK)
 	var ip layers.IPv4
@@ -500,35 +502,41 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 			println("output closed")
 		}()
 		for {
-			println("Listening for packet")
-			packet, err := packetSource.NextPacket()
-			println("Got a packet")
-			if err == io.EOF {
-				println("EOF")
-				break
-			}
-			if err != nil {
-				if err.Error() == pcap.NextErrorTimeoutExpired.Error() {
-					println("Timeout error")
-					continue
+			select {
+			case <-stop:
+				return
+			default:
+
+				println("Listening for packet")
+				packet, err := packetSource.NextPacket()
+				println("Got a packet")
+				if err == io.EOF {
+					println("EOF")
+					return
 				}
-			}
-			parser.DecodeLayers(packet.Data(), &decodedLayers)
-			for _, lyr := range decodedLayers {
-				println("Layer ", lyr.String())
-				//Look for TCP ACK
-				if lyr.Contains(layers.LayerTypeTCP) {
-					ack := PortACK{
-						Host: ip.SrcIP.String(),
-						Port: strings.Split(tcp.SrcPort.String(), "(")[0],
-						SYN:  tcp.SYN,
-						RST:  tcp.RST,
+				if err != nil {
+					if err.Error() == pcap.NextErrorTimeoutExpired.Error() {
+						println("Timeout error")
+						continue
 					}
-					output <- ack
-					if !config.Quiet && ack.IsOpen() {
-						fmt.Printf("%s:%s (%s) is %s\n", ack.Host, ack.Port, ack.GetServiceName(), ack.Status())
+				}
+				parser.DecodeLayers(packet.Data(), &decodedLayers)
+				for _, lyr := range decodedLayers {
+					println("Layer ", lyr.String())
+					//Look for TCP ACK
+					if lyr.Contains(layers.LayerTypeTCP) {
+						ack := PortACK{
+							Host: ip.SrcIP.String(),
+							Port: strings.Split(tcp.SrcPort.String(), "(")[0],
+							SYN:  tcp.SYN,
+							RST:  tcp.RST,
+						}
+						output <- ack
+						if !config.Quiet && ack.IsOpen() {
+							fmt.Printf("%s:%s (%s) is %s\n", ack.Host, ack.Port, ack.GetServiceName(), ack.Status())
+						}
+						break
 					}
-					break
 				}
 			}
 		}
