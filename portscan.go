@@ -124,9 +124,12 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 	filter := fmt.Sprintf(`(%s) and not src host %s`, strings.Join(cidrXs, " or "), route.SrcIP.String())
 	handle := getHandle(filter, config)
 	stop := make(chan bool)
+
 	out := listenForACKPackets(handle, route, config, stop)
 
 	go func() {
+		defer close(stop)
+
 		println("SCanCIDR goroutine")
 		sampleIP := ""
 		for cidrX, cidrPorts := range cidrPortMap {
@@ -176,7 +179,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 			println("timing out with IP", sampleIP)
 			closeHandle(handle, sampleIP, config, stop)
 		}
-		close(stop)
+
 	}()
 	println("Finished ScanCIDR")
 	return out
