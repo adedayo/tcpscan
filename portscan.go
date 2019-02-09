@@ -668,7 +668,7 @@ func getTimedHandle(bpfFilter string, timeOut time.Duration, config ScanConfig) 
 func getHandle(bpfFilter string, config ScanConfig) *pcap.Handle {
 	dev, _, err := getPreferredDevice(config)
 	bailout(err)
-	handle, err := pcap.OpenLive(dev.Name, 65535, false, pcap.BlockForever)
+	handle, err := pcap.OpenLive(dev.Name, 65535, true, pcap.BlockForever)
 	bailout(err)
 	handle.SetBPFFilter(bpfFilter)
 	return handle
