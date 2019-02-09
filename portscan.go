@@ -501,9 +501,12 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 			close(output)
 			println("output closed")
 		}()
-		for {
+		x := true
+		for x {
 			select {
 			case <-stop:
+				println("Got stop signal")
+				x = false
 				return
 			default:
 
@@ -512,6 +515,7 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 				println("Got a packet")
 				if err == io.EOF {
 					println("EOF")
+					x = false
 					return
 				}
 				if err != nil {
@@ -540,6 +544,7 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 				}
 			}
 		}
+		println("out for FOR loop")
 	}()
 	return output
 }
