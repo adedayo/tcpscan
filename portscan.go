@@ -513,41 +513,49 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 				close(stop)
 				println("Closed STOP channel")
 				return
-			default:
-				println("Listening for packet")
-				packet, err := packetSource.NextPacket()
-				println("Got a packet")
-				if err == io.EOF {
-					println("EOF")
-					x = false
-					return
-				}
-				if err != nil {
-					if err.Error() == pcap.NextErrorTimeoutExpired.Error() {
-						println("Timeout error")
-						continue
-					}
-				}
-				parser.DecodeLayers(packet.Data(), &decodedLayers)
-				for _, lyr := range decodedLayers {
-					println("Layer ", lyr.String())
-					//Look for TCP ACK
-					if lyr.Contains(layers.LayerTypeTCP) {
-						ack := PortACK{
-							Host: ip.SrcIP.String(),
-							Port: strings.Split(tcp.SrcPort.String(), "(")[0],
-							SYN:  tcp.SYN,
-							RST:  tcp.RST,
+			case ack := <-func() <-chan PortACK {
+				out := make(chan PortACK)
+				go func() {
+					for {
+						println("Listening for packet")
+						packet, err := packetSource.NextPacket()
+						println("Got a packet")
+						if err == io.EOF {
+							println("EOF")
+							x = false
+							break
 						}
-						output <- ack
-						if !config.Quiet && ack.IsOpen() {
-							fmt.Printf("%s:%s (%s) is %s\n", ack.Host, ack.Port, ack.GetServiceName(), ack.Status())
+						if err != nil {
+							if err.Error() == pcap.NextErrorTimeoutExpired.Error() {
+								println("Timeout error")
+								break
+							}
 						}
-						break
+						parser.DecodeLayers(packet.Data(), &decodedLayers)
+						for _, lyr := range decodedLayers {
+							println("Layer ", lyr.String())
+							//Look for TCP ACK
+							if lyr.Contains(layers.LayerTypeTCP) {
+								ack := PortACK{
+									Host: ip.SrcIP.String(),
+									Port: strings.Split(tcp.SrcPort.String(), "(")[0],
+									SYN:  tcp.SYN,
+									RST:  tcp.RST,
+								}
+								out <- ack
+								if !config.Quiet && ack.IsOpen() {
+									fmt.Printf("%s:%s (%s) is %s\n", ack.Host, ack.Port, ack.GetServiceName(), ack.Status())
+								}
+								break
+							}
+						}
 					}
-				}
-				println("end of default select")
+				}()
+				return out
+			}():
+				output <- ack
 			}
+
 		}
 		println("out for FOR loop")
 	}()
