@@ -141,7 +141,7 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 			go func(ips []string, ports []int) { // run the scans in parallel
 				println("SCanCIDR INNER goroutine")
 
-				writeHandle := getHandle(filter, config)
+				writeHandle := getNonFilteredHandle(config)
 				defer func() {
 					println("Closing writehandle")
 					writeHandle.Close()
@@ -151,7 +151,6 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 				sourcePort := 50000
 				for _, dstPort := range ports {
 					for _, dstIP := range ips {
-						fmt.Printf("Processing %s:%d\n", dstIP, dstPort)
 						dst := net.ParseIP(dstIP)
 						// Send a specified number of SYN packets
 						for i := 0; i < count; i++ {
@@ -656,5 +655,13 @@ func getHandle(bpfFilter string, config ScanConfig) *pcap.Handle {
 	handle, err := pcap.OpenLive(dev.Name, 65535, false, pcap.BlockForever)
 	bailout(err)
 	handle.SetBPFFilter(bpfFilter)
+	return handle
+}
+
+func getNonFilteredHandle(config ScanConfig) *pcap.Handle {
+	dev, _, err := getPreferredDevice(config)
+	bailout(err)
+	handle, err := pcap.OpenLive(dev.Name, 65535, false, pcap.BlockForever)
+	bailout(err)
 	return handle
 }
