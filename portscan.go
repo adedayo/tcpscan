@@ -485,7 +485,11 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	go func() {
-		defer close(output)
+		defer func() {
+			println("Closing output")
+			close(output)
+			println("Output closed")
+		}()
 		x := true
 		for x {
 			select {
