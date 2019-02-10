@@ -128,7 +128,6 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 	out := listenForACKPackets(handle, route, config, stop)
 
 	go func() {
-		println("SCanCIDR goroutine")
 		sampleIP := ""
 		for cidrX, cidrPorts := range cidrPortMap {
 			ipAdds := cidr.Expand(cidrX)
@@ -141,14 +140,8 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 			count := 1 //Number of SYN packets to send per port (make this a parameter)
 			//Send SYN packets asynchronously
 			go func(ips []string, ports []int) { // run the scans in parallel
-				println("SCanCIDR INNER goroutine")
-
 				writeHandle := getNonFilteredHandle(config)
-				defer func() {
-					println("Closing writehandle")
-					writeHandle.Close()
-					println("Closed writehandle")
-				}()
+				defer writeHandle.Close()
 				stopPort := 65535
 				sourcePort := 50000
 				for _, dstPort := range ports {
@@ -157,7 +150,6 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 						// Send a specified number of SYN packets
 						for i := 0; i < count; i++ {
 							rl.Take()
-							// fmt.Printf("Sending to IP %s and port %d\n", dstIP, dstPort)
 							err := sendSYNPacket(route.SrcIP, dst, sourcePort, dstPort, route, writeHandle)
 							bailout(err)
 							sourcePort++
@@ -170,17 +162,13 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 
 			}(ipAdds, cidrPorts)
 		}
-		println("Out of the loop")
 		timeout := time.Duration(config.Timeout) * time.Second
 		select {
 		case <-time.After(timeout):
-			println("timing out with IP", sampleIP)
 			closeHandle(handle, sampleIP, config, stop)
 		}
-		println("Out of SELECT-CASE")
 		return
 	}()
-	println("Finished ScanCIDR")
 	return out
 }
 
@@ -481,7 +469,6 @@ func (ppp *MyPPP) NextLayerType() gopacket.LayerType {
 
 //listenForACKPackets collects packets on the network that meet port scan specifications
 func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConfig, stop chan bool) <-chan PortACK {
-	println("listening for ACK packet")
 	output := make(chan PortACK)
 	var ip layers.IPv4
 	var tcp layers.TCP
@@ -498,42 +485,30 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	go func() {
-		println("In packet listening goroutine")
-		defer func() {
-			println("closing the output")
-			close(output)
-			println("output closed")
-		}()
+		defer close(output)
 		x := true
 		for x {
 			select {
 			case <-stop:
-				println("Got stop signal")
 				x = false
 				close(stop)
-				println("Closed STOP channel")
 				return
-			case ack := <-func() <-chan PortACK {
-				out := make(chan PortACK)
+			case <-func() <-chan bool {
+				out := make(chan bool) //channeled clossure just so we could us it in a select-case statement ;-)
+				close(out)
 				go func() {
 					for {
-						println("Listening for packet")
 						packet, err := packetSource.NextPacket()
-						println("Got a packet")
 						if err == io.EOF {
-							println("EOF")
-							x = false
 							break
 						}
 						if err != nil {
 							if err.Error() == pcap.NextErrorTimeoutExpired.Error() {
-								println("Timeout error")
 								break
 							}
 						}
 						parser.DecodeLayers(packet.Data(), &decodedLayers)
 						for _, lyr := range decodedLayers {
-							println("Layer ", lyr.String())
 							//Look for TCP ACK
 							if lyr.Contains(layers.LayerTypeTCP) {
 								ack := PortACK{
@@ -542,7 +517,7 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 									SYN:  tcp.SYN,
 									RST:  tcp.RST,
 								}
-								out <- ack
+								output <- ack
 								if !config.Quiet && ack.IsOpen() {
 									fmt.Printf("%s:%s (%s) is %s\n", ack.Host, ack.Port, ack.GetServiceName(), ack.Status())
 								}
@@ -553,11 +528,9 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 				}()
 				return out
 			}():
-				output <- ack
-			}
 
+			}
 		}
-		println("out for FOR loop")
 	}()
 	return output
 }

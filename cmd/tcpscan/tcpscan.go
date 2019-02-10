@@ -151,7 +151,6 @@ func outputJSON(ports []portscan.PortACK) {
 	   "resolved": "%s",
 	   "ports": [
 		  `, p.Host, hostName)
-
 		}
 		prefix := ""
 		if ind != 0 {
