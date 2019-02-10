@@ -495,7 +495,6 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 				return
 			case <-func() <-chan bool {
 				out := make(chan bool) //channeled clossure just so we could us it in a select-case statement ;-)
-				close(out)
 				go func() {
 					for {
 						packet, err := packetSource.NextPacket()
@@ -525,6 +524,7 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 							}
 						}
 					}
+					close(out)
 				}()
 				return out
 			}():
