@@ -1,212 +1,40 @@
+// Copyright © 2019 Adedayo Adetoye (aka Dayo)
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+//
+// 1. Redistributions of source code must retain the above copyright notice,
+//    this list of conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright notice,
+//    this list of conditions and the following disclaimer in the documentation
+//    and/or other materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its contributors
+//    may be used to endorse or promote products derived from this software
+//    without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+
 package main
 
-import (
-	"fmt"
-	"log"
-	"net"
-	"os"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
-
-	"github.com/adedayo/cidr"
-	portscan "github.com/adedayo/tcpscan"
-	"github.com/urfave/cli"
-)
+import "github.com/adedayo/tcpscan/cmd/tcpscan/cmd"
 
 var (
 	version = "0.0.0" // deployed version will be taken from release tags
-	commit  = "none"
-	date    = "unknown"
 )
 
 func main() {
-
-	app := cli.NewApp()
-	app.Name = "tcpscan"
-	app.Version = version
-	app.Usage = "Scan for open TCP ports on servers"
-	app.UsageText = `Scan for open (or closed) TCP ports on servers. 
-	
-Example:
-	
-tcpscan 8.8.8.8/32 10.10.10.1/30
-
-`
-	app.Flags = []cli.Flag{
-		cli.BoolFlag{
-			Name:  "json, j",
-			Usage: "generate JSON output",
-		},
-		&cli.IntFlag{
-			Name:  "timeout, t",
-			Usage: "timeout (in seconds) to adjust how much we are willing to wait for servers to come back with responses. Smaller timeout sacrifices accuracy for speed",
-			Value: 5,
-		},
-		&cli.IntFlag{
-			Name:  "rate, r",
-			Usage: "the rate (in packets per second) that we should send SYN scan packets. This influences overall scan time, but be careful not to overwhelm your network",
-			Value: 1000,
-		},
-		cli.BoolFlag{
-			Name:  "quiet, q",
-			Usage: "control whether to produce a running commentary of intermediate results or stay quiet till the end",
-		},
-		&cli.StringFlag{
-			Name:  "interface, i",
-			Usage: "interface to use e.g. eth0, ppp0. If specified, bypasses automated guessing",
-			Value: "",
-		},
-	}
-	app.EnableBashCompletion = true
-
-	app.Authors = []cli.Author{
-		{
-			Name:  "Adedayo Adetoye (Dayo)",
-			Email: "https://github.com/adedayo",
-		},
-	}
-
-	app.Action = func(c *cli.Context) error {
-		return process(c)
-	}
-
-	err := app.Run(os.Args)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-}
-
-func process(c *cli.Context) error {
-	if c.NArg() == 0 {
-		c.App.Run([]string{"tcpscan", "h"})
-		return nil
-	}
-	if !c.GlobalBool("json") {
-		fmt.Printf("Starting TCPScan %s (%s)\n", version, "https://github.com/adedayo/tcpscan")
-	}
-	t := time.Now()
-	args := []string{}
-	args = append(args, c.Args().First())
-	args = append(args, c.Args().Tail()...)
-	scan := make(map[string]portscan.PortACK)
-	config := portscan.ScanConfig{
-		Timeout:          c.Int("timeout"),
-		PacketsPerSecond: c.Int("rate"),
-		Quiet:            c.Bool("quiet"),
-		Interface:        c.String("interface"),
-		CommandLine:      true,
-	}
-	for ack := range portscan.ScanCIDR(config, args...) {
-		key := ack.Host + ack.Port
-		if _, present := scan[key]; !present {
-			scan[key] = ack
-		}
-	}
-
-	var portAckList []portscan.PortACK
-	for k := range scan {
-		portAckList = append(portAckList, scan[k])
-	}
-
-	sort.Sort(portAckSorter(portAckList))
-
-	if c.GlobalBool("json") {
-		outputJSON(portAckList)
-	} else {
-		outputText(portAckList)
-	}
-	hosts := []string{}
-	for _, h := range args {
-		hosts = append(hosts, cidr.Expand(h)...)
-	}
-	fmt.Printf("Scanned %d hosts in %f seconds\n", len(hosts), time.Since(t).Seconds())
-	return nil
-}
-
-func outputJSON(ports []portscan.PortACK) {
-	result := ""
-	current := ""
-	hostName := ""
-	ind := 0
-	for _, p := range ports {
-		if p.Host != current {
-			ind = 0
-			if current != "" {
-				result += `]},
-  `
-			}
-			current = p.Host
-			h, err := net.LookupAddr(p.Host)
-			if err != nil {
-				hostName = ""
-			} else {
-				hostName = fmt.Sprintf("%s", strings.Join(h, ", "))
-			}
-			result += fmt.Sprintf(
-				`  "%s": 
-     {
-	   "resolved": "%s",
-	   "ports": [
-		  `, p.Host, hostName)
-		}
-		prefix := ""
-		if ind != 0 {
-			prefix = `,
-	          `
-		}
-		result += fmt.Sprintf(`%s{"port": %s, "state": "%s","service": "%s"}`,
-			prefix, p.Port, p.Status(), p.GetServiceName())
-		ind++
-	}
-	println("{\n" + result + `]}
-}`)
-}
-
-func outputText(ports []portscan.PortACK) {
-	result := ""
-	current := ""
-	hostName := ""
-	for _, p := range ports {
-		if p.Host != current {
-			current = p.Host
-			h, err := net.LookupAddr(p.Host)
-			if err != nil {
-				hostName = ""
-			} else {
-				hostName = fmt.Sprintf("(%s)", strings.Join(h, ", "))
-			}
-			result += fmt.Sprintf("\nTCPScan result for %s %s\n", p.Host, hostName)
-			result += fmt.Sprintf("%-6s %-10s %s\n", "PORT", "STATE", "SERVICE")
-		}
-		result += fmt.Sprintf("%-6s %-10s %s\n", p.Port, p.Status(), p.GetServiceName())
-	}
-	println(result)
-}
-
-func status(ack portscan.PortACK) string {
-	if ack.IsClosed() {
-		return "Closed"
-	}
-	if ack.IsOpen() {
-		return "Open"
-	}
-	return "Unknown Status"
-}
-
-type portAckSorter []portscan.PortACK
-
-func (k portAckSorter) Len() int {
-	return len(k)
-}
-
-func (k portAckSorter) Swap(i, j int) {
-	k[i], k[j] = k[j], k[i]
-}
-func (k portAckSorter) Less(i, j int) bool {
-	iPort, _ := strconv.Atoi(k[i].Port)
-	jPort, _ := strconv.Atoi(k[j].Port)
-	return k[i].Host < k[j].Host || (k[i].Host == k[j].Host && iPort <= jPort)
+	cmd.Execute(version)
 }
