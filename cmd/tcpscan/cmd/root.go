@@ -30,13 +30,16 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/adedayo/cidr"
 	portscan "github.com/adedayo/tcpscan"
 	"github.com/spf13/cobra"
 )
@@ -89,7 +92,7 @@ func runner(cmd *cobra.Command, args []string) error {
 	if !jsonOut {
 		fmt.Printf("Starting TCPScan %s (%s)\n", cmd.Version, "https://github.com/adedayo/tcpscan")
 	}
-	// t := time.Now()
+	t := time.Now()
 	scan := make(map[string]portscan.PortACK)
 	config := portscan.ScanConfig{
 		Timeout:          timeout,
@@ -117,46 +120,55 @@ func runner(cmd *cobra.Command, args []string) error {
 	} else {
 		outputText(portAckList)
 	}
+	hosts := []string{}
+	for _, h := range args {
+		hosts = append(hosts, cidr.Expand(h)...)
+	}
+	fmt.Printf("Scanned %d hosts in %f seconds\n", len(hosts), time.Since(t).Seconds())
 	return nil
 }
 
 func outputJSON(ports []portscan.PortACK) {
-	result := ""
-	current := ""
-	hostName := ""
-	ind := 0
-	for _, p := range ports {
-		if p.Host != current {
-			ind = 0
-			if current != "" {
-				result += `]},
-  `
-			}
-			current = p.Host
-			h, err := net.LookupAddr(p.Host)
+	hostnames := make(map[string][]string)
+	results := make(map[string]jsonResult)
+	for _, ack := range ports {
+		ip := ack.Host
+		if _, present := hostnames[ip]; !present {
+			h, err := net.LookupAddr(ip)
 			if err != nil {
-				hostName = ""
+				hostnames[ip] = []string{}
 			} else {
-				hostName = fmt.Sprintf("%s", strings.Join(h, ", "))
+				hostnames[ip] = h
 			}
-			result += fmt.Sprintf(
-				`  "%s": 
-     {
-	   "resolved": "%s",
-	   "ports": [
-		  `, p.Host, hostName)
 		}
-		prefix := ""
-		if ind != 0 {
-			prefix = `,
-	          `
+
+		if res, present := results[ip]; !present {
+			res = jsonResult{
+				IP:        ip,
+				Hostnames: hostnames[ip],
+				Ports:     []portState{},
+			}
+			results[ip] = res
 		}
-		result += fmt.Sprintf(`%s{"port": %s, "state": "%s","service": "%s"}`,
-			prefix, p.Port, p.Status(), p.GetServiceName())
-		ind++
+
+		result := results[ip]
+		if port, err := strconv.Atoi(ack.Port); err == nil {
+			result.Ports = append(result.Ports, portState{
+				Port:    port,
+				Service: ack.GetServiceName(),
+				State:   ack.Status(),
+			})
+			results[ip] = result
+		}
 	}
-	println("{\n" + result + `]}
-}`)
+	data := []jsonResult{}
+	for _, v := range results {
+		data = append(data, v)
+	}
+	if out, err := json.MarshalIndent(data, "", "  "); err == nil {
+
+		println(string(out))
+	}
 }
 
 func outputText(ports []portscan.PortACK) {
@@ -203,4 +215,16 @@ func (k portAckSorter) Less(i, j int) bool {
 	iPort, _ := strconv.Atoi(k[i].Port)
 	jPort, _ := strconv.Atoi(k[j].Port)
 	return k[i].Host < k[j].Host || (k[i].Host == k[j].Host && iPort <= jPort)
+}
+
+type jsonResult struct {
+	IP        string
+	Hostnames []string
+	Ports     []portState
+}
+
+type portState struct {
+	Port    int
+	State   string
+	Service string
 }
