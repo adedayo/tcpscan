@@ -74,18 +74,19 @@ Author: Adedayo Adetoye (Dayo) <https://github.com/adedayo>`, version)
 }
 
 func init() {
-	configPath := "config/path"
-	app := "tcpscan"
+	// configPath := "config/path"
+	// app := "tcpscan"
 	rootCmd.Flags().BoolVarP(&jsonOut, "json", "j", false, "generate JSON output")
 	rootCmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "control whether to produce a running commentary of intermediate results or stay quiet till the end")
 	rootCmd.Flags().IntVarP(&timeout, "timeout", "t", 5, "TIMEOUT (in seconds) to adjust how much we are willing to wait for servers to come back with responses. Smaller timeout sacrifices accuracy for speed")
 	rootCmd.Flags().IntVarP(&rate, "rate", "r", 1000, "the rate (in packets per second) that we should send SYN scan packets. This influences overall scan time, but be careful not to overwhelm your network")
-	rootCmd.Flags().StringVarP(&service, "service", "s", configPath, fmt.Sprintf("run %s as a service", app))
-	rootCmd.Flag("service").NoOptDefVal = configPath
+	// rootCmd.Flags().StringVarP(&service, "service", "s", configPath, fmt.Sprintf("run %s as a service", app))
+	// rootCmd.Flag("service").NoOptDefVal = configPath
 }
 
 func runner(cmd *cobra.Command, args []string) error {
-	if len(args) == 0 && !cmd.Flag("service").Changed {
+	// && !cmd.Flag("service").Changed
+	if len(args) == 0 {
 		return cmd.Usage()
 	}
 
