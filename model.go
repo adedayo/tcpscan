@@ -8,7 +8,34 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
+
+//TCPScanConfig config data structure for the scanner service
+type TCPScanConfig struct {
+	DailySchedules   []string `yaml:"dailySchedules"` // in the format 13:45, 01:20 etc
+	IsProduction     bool     `yaml:"isProduction"`
+	PacketsPerSecond int      `yaml:"packetsPerSecond"`
+	Timeout          int      `yaml:"timeout"`
+	CIDRRanges       []string `yaml:"cidrRanges"`
+}
+
+//ScanRequest is a model to describe a given TLS Audit scan
+type ScanRequest struct {
+	CIDRs  []string
+	Config ScanConfig
+	Day    string //Date the scan was run in the format yyyy-mm-dd
+	ScanID string //Non-empty ScanID means this is a ScanRequest to resume an existing, possibly incomplete, scan
+}
+
+//PersistedScanRequest persisted version of ScanRequest
+type PersistedScanRequest struct {
+	Request   ScanRequest
+	Hosts     []string
+	ScanStart time.Time
+	ScanEnd   time.Time
+	Progress  int
+}
 
 //ScanConfig describes details of how the port scan should be carried out
 type ScanConfig struct {
@@ -142,4 +169,20 @@ func (k knownPortSorter) Swap(i, j int) {
 }
 func (k knownPortSorter) Less(i, j int) bool {
 	return k[i].Frequency > k[j].Frequency //sort descending
+}
+
+//PortAckSorter sorts ack messages
+type PortAckSorter []PortACK
+
+func (k PortAckSorter) Len() int {
+	return len(k)
+}
+
+func (k PortAckSorter) Swap(i, j int) {
+	k[i], k[j] = k[j], k[i]
+}
+func (k PortAckSorter) Less(i, j int) bool {
+	iPort, _ := strconv.Atoi(k[i].Port)
+	jPort, _ := strconv.Atoi(k[j].Port)
+	return k[i].Host < k[j].Host || (k[i].Host == k[j].Host && iPort <= jPort)
 }

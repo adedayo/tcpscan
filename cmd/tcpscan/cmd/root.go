@@ -74,20 +74,25 @@ Author: Adedayo Adetoye (Dayo) <https://github.com/adedayo>`, version)
 }
 
 func init() {
-	// configPath := "config/path"
-	// app := "tcpscan"
+	configPath := portscan.TCPScanConfigPath
+	app := "tcpscan"
 	rootCmd.Flags().BoolVarP(&jsonOut, "json", "j", false, "generate JSON output")
 	rootCmd.Flags().BoolVarP(&quiet, "quiet", "q", false, "control whether to produce a running commentary of intermediate results or stay quiet till the end")
 	rootCmd.Flags().IntVarP(&timeout, "timeout", "t", 5, "TIMEOUT (in seconds) to adjust how much we are willing to wait for servers to come back with responses. Smaller timeout sacrifices accuracy for speed")
 	rootCmd.Flags().IntVarP(&rate, "rate", "r", 1000, "the rate (in packets per second) that we should send SYN scan packets. This influences overall scan time, but be careful not to overwhelm your network")
-	// rootCmd.Flags().StringVarP(&service, "service", "s", configPath, fmt.Sprintf("run %s as a service", app))
-	// rootCmd.Flag("service").NoOptDefVal = configPath
+	rootCmd.Flags().StringVarP(&service, "service", "s", configPath, fmt.Sprintf("run %s as a service", app))
+	rootCmd.Flag("service").NoOptDefVal = configPath
 }
 
 func runner(cmd *cobra.Command, args []string) error {
-	// && !cmd.Flag("service").Changed
-	if len(args) == 0 {
+	//
+	if len(args) == 0 && !cmd.Flag("service").Changed {
 		return cmd.Usage()
+	}
+
+	if cmd.Flag("service").Changed { // run as a service
+		portscan.Service(service)
+		return nil
 	}
 
 	if !jsonOut {
@@ -114,7 +119,7 @@ func runner(cmd *cobra.Command, args []string) error {
 		portAckList = append(portAckList, scan[k])
 	}
 
-	sort.Sort(portAckSorter(portAckList))
+	sort.Sort(portscan.PortAckSorter(portAckList))
 
 	if jsonOut {
 		outputJSON(portAckList)
@@ -201,21 +206,6 @@ func status(ack portscan.PortACK) string {
 		return "Open"
 	}
 	return "Unknown Status"
-}
-
-type portAckSorter []portscan.PortACK
-
-func (k portAckSorter) Len() int {
-	return len(k)
-}
-
-func (k portAckSorter) Swap(i, j int) {
-	k[i], k[j] = k[j], k[i]
-}
-func (k portAckSorter) Less(i, j int) bool {
-	iPort, _ := strconv.Atoi(k[i].Port)
-	jPort, _ := strconv.Atoi(k[j].Port)
-	return k[i].Host < k[j].Host || (k[i].Host == k[j].Host && iPort <= jPort)
 }
 
 type jsonResult struct {
