@@ -200,7 +200,8 @@ func getRoute(config ScanConfig) routeFinder {
 	return route
 }
 
-func parsePorts(portsString string) (ports []int) {
+func parsePorts(portsString string) []int {
+	ports := []int{}
 	pp := strings.Split(portsString, ",")
 	for _, p := range pp {
 		if strings.Contains(p, "-") {
@@ -233,7 +234,15 @@ func parsePorts(portsString string) (ports []int) {
 			ports = append(ports, i)
 		}
 	}
-	return
+	uniquePorts := make(map[int]bool)
+	for _, p := range ports {
+		uniquePorts[p] = true
+	}
+	ports = []int{}
+	for p := range uniquePorts {
+		ports = append(ports, p)
+	}
+	return ports
 }
 
 //allow domains to be used in CIDRs
