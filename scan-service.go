@@ -124,7 +124,6 @@ func ScheduleTCPScan(ipSource func() []string) {
 	}
 
 	if config, err := loadConfig(TCPScanConfigPath); err == nil {
-		runTCPScan(ipSource)
 		for _, t := range config.DailySchedules {
 			if config.IsProduction {
 				println("Running next at ", t)
