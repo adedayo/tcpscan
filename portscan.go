@@ -495,12 +495,12 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	go func() {
 		defer close(output)
+		defer close(stop)
 		x := true
 		for x {
 			select {
 			case <-stop:
 				x = false
-				close(stop)
 				return
 			case <-func() <-chan bool {
 				out := make(chan bool) //channeled clossure just so we could us it in a select-case statement ;-)
