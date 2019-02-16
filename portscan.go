@@ -495,50 +495,48 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	go func() {
 		defer close(output)
-		defer close(stop)
 		x := true
-		for x {
-			select {
-			case <-stop:
-				x = false
-				return
-			case <-func() <-chan bool {
-				out := make(chan bool) //channeled clossure just so we could us it in a select-case statement ;-)
-				go func() {
-					for x {
-						packet, err := packetSource.NextPacket()
-						if err == io.EOF {
+		select {
+		case <-stop:
+			x = false
+			close(stop)
+			return
+		case <-func() <-chan bool {
+			out := make(chan bool) //channeled clossure just so we could us it in a select-case statement ;-)
+			go func() {
+				for x {
+					packet, err := packetSource.NextPacket()
+					if err == io.EOF {
+						break
+					}
+					if err != nil {
+						if err.Error() == pcap.NextErrorTimeoutExpired.Error() {
 							break
 						}
-						if err != nil {
-							if err.Error() == pcap.NextErrorTimeoutExpired.Error() {
-								break
+					}
+					parser.DecodeLayers(packet.Data(), &decodedLayers)
+					for _, lyr := range decodedLayers {
+						//Look for TCP ACK
+						if lyr.Contains(layers.LayerTypeTCP) {
+							ack := PortACK{
+								Host: ip.SrcIP.String(),
+								Port: strings.Split(tcp.SrcPort.String(), "(")[0],
+								SYN:  tcp.SYN,
+								RST:  tcp.RST,
 							}
-						}
-						parser.DecodeLayers(packet.Data(), &decodedLayers)
-						for _, lyr := range decodedLayers {
-							//Look for TCP ACK
-							if lyr.Contains(layers.LayerTypeTCP) {
-								ack := PortACK{
-									Host: ip.SrcIP.String(),
-									Port: strings.Split(tcp.SrcPort.String(), "(")[0],
-									SYN:  tcp.SYN,
-									RST:  tcp.RST,
-								}
-								output <- ack
-								if !config.Quiet && ack.IsOpen() {
-									fmt.Printf("%s:%s (%s) is %s\n", ack.Host, ack.Port, ack.GetServiceName(), ack.Status())
-								}
-								break
+							output <- ack
+							if !config.Quiet && ack.IsOpen() {
+								fmt.Printf("%s:%s (%s) is %s\n", ack.Host, ack.Port, ack.GetServiceName(), ack.Status())
 							}
+							break
 						}
 					}
-					close(out)
-				}()
-				return out
-			}():
+				}
+				close(out)
+			}()
+			return out
+		}():
 
-			}
 		}
 	}()
 	return output
