@@ -131,6 +131,9 @@ func ScanCIDR(config ScanConfig, cidrAddresses ...string) <-chan PortACK {
 		sampleIP := ""
 		for cidrX, cidrPorts := range cidrPortMap {
 			ipAdds := cidr.Expand(cidrX)
+			if len(ipAdds) == 0 {
+				continue
+			}
 			//shuffle the IP addresses pseudo-randomly
 			mathrand.Shuffle(len(ipAdds), func(i, j int) {
 				ipAdds[i], ipAdds[j] = ipAdds[j], ipAdds[i]
