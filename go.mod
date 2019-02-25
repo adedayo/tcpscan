@@ -13,6 +13,6 @@ require (
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/viper v1.3.1
 	go.uber.org/ratelimit v0.0.0-20180316092928-c15da0234277
-	golang.org/x/net v0.0.0-20190206173232-65e2d4e15006 // indirect
+	golang.org/x/net v0.0.0-20190206173232-65e2d4e15006
 	gopkg.in/yaml.v2 v2.2.2
 )

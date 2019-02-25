@@ -70,6 +70,7 @@ var (
 
 type routeFinder struct {
 	IsPPP           bool
+	IsTun           bool
 	SrcHardwareAddr net.HardwareAddr
 	DstHardwareAddr net.HardwareAddr
 	SrcIP           net.IP
@@ -192,6 +193,8 @@ func getRoute(config ScanConfig) routeFinder {
 	route.SrcIP = iface.IP
 	if strings.HasPrefix(dev.Name, "ppp") {
 		route.IsPPP = true
+	} else if strings.HasPrefix(dev.Name, "utun") {
+		route.IsTun = true
 	} else {
 		routerHW, err := determineRouterHardwareAddress(config)
 		bailout(err)
@@ -290,6 +293,11 @@ func sendSYNPacket(src, dst net.IP, srcPort, dstPrt int, route routeFinder, hand
 		}
 		ppp.Contents = []byte{0xff, 0x03}
 		firstLayer = &ppp
+	} else if route.IsTun {
+		tun := layers.Loopback{
+			Family: layers.ProtocolFamilyIPv4,
+		}
+		firstLayer = &tun
 	} else {
 		eth := layers.Ethernet{
 			SrcMAC:       route.SrcHardwareAddr,
@@ -309,7 +317,6 @@ func sendSYNPacket(src, dst net.IP, srcPort, dstPrt int, route routeFinder, hand
 		TTL:        255,
 		Protocol:   layers.IPProtocolTCP,
 	}
-	// fmt.Printf("%#v", firstLayer)
 	timebuf := make([]byte, 8)
 	rand.Read(timebuf)
 	for i := 4; i < 8; i++ {
@@ -488,6 +495,9 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 	if route.IsPPP {
 		var ppp MyPPP
 		parser = gopacket.NewDecodingLayerParser(layers.LayerTypePPP, &ppp, &ip, &tcp)
+	} else if route.IsTun {
+		var tun layers.Loopback
+		parser = gopacket.NewDecodingLayerParser(layers.LayerTypeLoopback, &tun, &ip, &tcp)
 	} else {
 		var eth layers.Ethernet
 		parser = gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &ip, &tcp)
@@ -575,14 +585,15 @@ func getPreferredDevice(config ScanConfig) (pcap.Interface, net.Interface, error
 		return dev, *ifx, err
 	}
 
-	for i := 0; i < 5; i++ {
-		//search in this order: VPN, then non-VPN; from lower interface index 0 up till 4
-		//i.e ppp0, en0, eth0, ppp1, en1, eth1, ...
-		for _, iface := range []string{"ppp", "en", "eth"} {
+	//search in this order: VPN, then non-VPN; from lower interface index 0 up till 4
+	//i.e ppp0, ppp1, ..., ppp4, utun0, utun1, ..., utun4, en0, ..., en4, eth0, ..., eth4
+	for _, iface := range []string{"ppp", "utun", "en", "eth"} {
+		for i := 0; i < 5; i++ {
 			for _, dev := range devices {
 				if dev.Name == fmt.Sprintf("%s%d", iface, i) {
-					ifx, err := getRoutableInterface(dev)
-					return dev, ifx, err
+					if ifx, err := getRoutableInterface(dev); err == nil {
+						return dev, ifx, err
+					}
 				}
 			}
 		}
@@ -622,8 +633,9 @@ func getPreferredDevice(config ScanConfig) (pcap.Interface, net.Interface, error
 }
 
 func getRoutableInterface(dev pcap.Interface) (net.Interface, error) {
-	if strings.HasPrefix(dev.Name, "ppp") {
-		return net.Interface{}, nil
+	if strings.HasPrefix(dev.Name, "ppp") || strings.HasPrefix(dev.Name, "utun") {
+		_, err := getIPv4InterfaceAddress(dev)
+		return net.Interface{}, err
 	}
 
 	for _, add := range dev.Addresses {
