@@ -345,11 +345,13 @@ func sendSYNPacket(src, dst net.IP, srcPort, dstPrt int, route routeFinder, hand
 
 //determineRouterHardwareAddress finds the router by looking at the ethernet frames that returns the TCP ACK handshake from "google"
 func determineRouterHardwareAddress(config ScanConfig) (net.HardwareAddr, error) {
-	outAlt := alternativeGatewayHWDiscovery(config)
+	outAlt, altHandle := alternativeGatewayHWDiscovery(config)
 	google := "www.google.com"
 	_, iface, err := getPreferredDevice(config)
 	bailout(err)
 	handle := getTimedHandle(fmt.Sprintf("host %s and ether dst %s", google, iface.HardwareAddr.String()), 5*time.Second, config)
+	defer handle.Close()
+
 	out := listenForEthernetPackets(handle)
 	go func() {
 		_, err = net.DialTimeout("tcp", fmt.Sprintf("%s:443", google), 5*time.Second)
@@ -357,6 +359,7 @@ func determineRouterHardwareAddress(config ScanConfig) (net.HardwareAddr, error)
 	}()
 	select {
 	case hwAddress := <-out: //found via TCP connect
+		altHandle.Close() // ensure the ARP handle is closed
 		return hwAddress, nil
 	case hwAddress := <-outAlt: //found via ARP
 		return hwAddress, nil
@@ -365,7 +368,7 @@ func determineRouterHardwareAddress(config ScanConfig) (net.HardwareAddr, error)
 	}
 }
 
-func alternativeGatewayHWDiscovery(config ScanConfig) <-chan net.HardwareAddr {
+func alternativeGatewayHWDiscovery(config ScanConfig) (<-chan net.HardwareAddr, *pcap.Handle) {
 	dev, iface, err := getPreferredDevice(config)
 	bailout(err)
 	var srcIP net.IP
@@ -379,30 +382,31 @@ func alternativeGatewayHWDiscovery(config ScanConfig) <-chan net.HardwareAddr {
 	if err != nil {
 		bailout(err)
 	}
-	handle, err := pcap.OpenLive(dev.Name, 65536, true, 20*time.Second)
+	handle, err := pcap.OpenLive(dev.Name, 65536, true, 30*time.Second)
 	if err != nil {
 		bailout(err)
 	}
-	out := readARP(handle, &iface, dstIP)
+	out := readARP(handle, dstIP)
 	writeArp(handle, &iface, srcIP, dstIP)
-	return out
+	return out, handle
 }
 
-func readARP(handle *pcap.Handle, iface *net.Interface, dstIP []byte) <-chan net.HardwareAddr {
+func readARP(handle *pcap.Handle, dstIP []byte) <-chan net.HardwareAddr {
 	packetSource := gopacket.NewPacketSource(handle, layers.LayerTypeEthernet)
 	output := make(chan net.HardwareAddr)
 	targetIP := net.IP(dstIP)
 	go func() {
+		defer close(output)
 		for packet := range packetSource.Packets() {
 			if arpLayer := packet.Layer(layers.LayerTypeARP); arpLayer != nil {
 				arp := arpLayer.(*layers.ARP)
 				if srcIP := net.IP(arp.SourceProtAddress); arp != nil && srcIP.Equal(targetIP) {
 					out := net.HardwareAddr(arp.SourceHwAddress)
 					output <- out
+					return
 				}
 			}
 		}
-		close(output)
 	}()
 	return output
 }
@@ -435,26 +439,24 @@ func writeArp(handle *pcap.Handle, srcIFace *net.Interface, srcIP, dstIP net.IP)
 func listenForEthernetPackets(handle *pcap.Handle) <-chan net.HardwareAddr {
 	output := make(chan net.HardwareAddr)
 	go func() {
+		defer func() {
+			close(output)
+			handle.Close() //timeout doesn't seem to close the handle
+		}()
 		var eth layers.Ethernet
-		// var ip layers.IPv4
 		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth)
-		// parser := gopacket.NewDecodingLayerParser(layers.LayerTypeIPv4, &ip)
 		decodedLayers := []gopacket.LayerType{}
 		packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 		for packet := range packetSource.Packets() {
-			// fmt.Printf("Packet: %#v\n", packet)
 			parser.DecodeLayers(packet.Data(), &decodedLayers)
 			for _, lyr := range decodedLayers {
 				//Look for Ethernet frames
-				// fmt.Printf("Decoded: %#v\n", lyr)
 				if lyr.Contains(layers.LayerTypeEthernet) {
-					// println("Mac: ", eth.SrcMAC)
 					output <- eth.SrcMAC
-					break
+					return
 				}
 			}
 		}
-		close(output)
 	}()
 	return output
 }
