@@ -510,15 +510,12 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	go func() {
 		defer func() {
-			println("Closing output and stop channels")
 			close(output)
 			close(stop)
-			println("Output and stop channels closed")
 		}()
 		for {
 			select {
 			case <-stop:
-				println("Firing Stop")
 				return
 			default:
 				packet, err := packetSource.NextPacket()
@@ -540,8 +537,6 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 							SYN:  tcp.SYN,
 							RST:  tcp.RST,
 						}
-						println("Writing an ACK", ip.SrcIP.String(), strings.Split(tcp.SrcPort.String(), "(")[0],
-							tcp.SYN, tcp.RST)
 						output <- ack
 						if !config.Quiet && ack.IsOpen() {
 							fmt.Printf("%s:%s (%s) is %s\n", ack.Host, ack.Port, ack.GetServiceName(), ack.Status())
