@@ -182,6 +182,7 @@ func getRoute(config ScanConfig) routeFinder {
 	if config == lastConfig {
 		return lastRoute
 	}
+	println("Calculating Route")
 	//get the network interface to use for scanning: ppp0, eth0, en0 etc.
 	route := routeFinder{}
 	dev, netIface, err := getPreferredDevice(config)

@@ -105,7 +105,6 @@ func runner(cmd *cobra.Command, args []string) error {
 		PacketsPerSecond: rate,
 		Quiet:            quiet,
 		Interface:        iface,
-		CommandLine:      true,
 	}
 	for ack := range portscan.ScanCIDR(config, args...) {
 		key := ack.Host + ack.Port
