@@ -513,51 +513,38 @@ func listenForACKPackets(handle *pcap.Handle, route routeFinder, config ScanConf
 			close(output)
 			close(stop)
 		}()
-		select {
-		case <-stop:
-			return
-		case <-func() <-chan bool {
-			out := make(chan bool) //channeled clossure just so we could us it in a select-case statement ;-)
-			go func() {
-				defer close(out)
-				for {
-					select {
-					case <-stop:
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				packet, err := packetSource.NextPacket()
+				if err == io.EOF {
+					return
+				}
+				if err != nil {
+					if err.Error() != pcap.NextErrorTimeoutExpired.Error() {
 						return
-					default:
-						packet, err := packetSource.NextPacket()
-						if err == io.EOF {
-							return
-						}
-						if err != nil {
-							if err.Error() == pcap.NextErrorTimeoutExpired.Error() {
-								continue
-							}
-							return
-						}
-						parser.DecodeLayers(packet.Data(), &decodedLayers)
-						for _, lyr := range decodedLayers {
-							//Look for TCP ACK
-							if lyr.Contains(layers.LayerTypeTCP) {
-								ack := PortACK{
-									Host: ip.SrcIP.String(),
-									Port: strings.Split(tcp.SrcPort.String(), "(")[0],
-									SYN:  tcp.SYN,
-									RST:  tcp.RST,
-								}
-								output <- ack
-								if !config.Quiet && ack.IsOpen() {
-									fmt.Printf("%s:%s (%s) is %s\n", ack.Host, ack.Port, ack.GetServiceName(), ack.Status())
-								}
-								break
-							}
-						}
 					}
 				}
-			}()
-			return out
-		}():
-
+				parser.DecodeLayers(packet.Data(), &decodedLayers)
+				for _, lyr := range decodedLayers {
+					//Look for TCP ACK
+					if lyr.Contains(layers.LayerTypeTCP) {
+						ack := PortACK{
+							Host: ip.SrcIP.String(),
+							Port: strings.Split(tcp.SrcPort.String(), "(")[0],
+							SYN:  tcp.SYN,
+							RST:  tcp.RST,
+						}
+						output <- ack
+						if !config.Quiet && ack.IsOpen() {
+							fmt.Printf("%s:%s (%s) is %s\n", ack.Host, ack.Port, ack.GetServiceName(), ack.Status())
+						}
+						break
+					}
+				}
+			}
 		}
 	}()
 	return output
