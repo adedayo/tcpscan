@@ -1,4 +1,7 @@
 [![Build Status](https://travis-ci.org/adedayo/tcpscan.svg?branch=master)](https://travis-ci.org/adedayo/tcpscan)
+[![Go Report Card](https://goreportcard.com/badge/github.com/adedayo/tcpscan)](https://goreportcard.com/report/github.com/adedayo/tcpscan)
+![GitHub release](https://img.shields.io/github/release/adedayo/tcpscan.svg)
+[![GitHub license](https://img.shields.io/github/license/adedayo/tcpscan.svg)](https://github.com/adedayo/tcpscan/blob/master/LICENSE)
 
 # TCPScan 
 TCPScan is a simple utility for discovering open (or closed) TCP ports on servers. It uses `gopacket`(https://github.com/google/gopacket) to craft SYN packets, listening asynchronously for (SYN-)ACK or RST responses without completing the full TCP handshake. TCPScan uses goroutines for asynchronous scans and it searches for the most likely listening ports first, using NMap's "port frequency" ordering. Anecdotal results show that TCPScan is fast!
@@ -39,13 +42,20 @@ Note that scans generally run faster with shorter timeouts, but you may be sacri
 ### Command line options
 
 ```bash
-   --json, -j                   generate JSON output
-   --timeout value, -t value    timeout (in seconds) to adjust how much we are willing to wait for servers to come back with responses. Smaller timeout sacrifices accuracy for speed (default: 5)
-   --rate value, -r value       the rates (in packets per second) that we should send SYN scan packets. This influences overall scan time, but be careful not to overwhelm your network (default: 1000)
-   --quiet, -q                  control whether to produce a running commentary of intermediate results or stay quiet till the end
-   --interface value, -i value  interface to use e.g. eth0, ppp0. If specified, bypasses automated guessing
-   --help, -h                   show help
-   --version, -v                print the version
+Usage:
+  tcpscan [flags]
+
+Examples:
+tcpscan 8.8.8.8/32 10.10.10.1/30
+
+Flags:
+  -h, --help                                               help for tcpscan
+  -j, --json                                               generate JSON output
+  -q, --quiet                                              control whether to produce a running commentary of intermediate results or stay quiet till the end
+  -r, --rate int                                           the rate (in packets per second) that we should send SYN scan packets. This influences overall scan time, but be careful not to overwhelm your network (default 1000)
+  -s, --service string[="data/config/TCPScanConfig.yml"]   run tcpscan as a service (default "data/config/TCPScanConfig.yml")
+  -t, --timeout int                                        TIMEOUT (in seconds) to adjust how much we are willing to wait for servers to come back with responses. Smaller timeout sacrifices accuracy for speed (default 5)
+      --version                                            version for tcpscan
 ```
 
 ## Using TCPScan as a library
