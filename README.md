@@ -100,15 +100,9 @@ func status(ack portscan.PortACK) string {
 ```
 This should produce an output similar to the following:
 ```
-8.8.8.8:        Port 80(http) is Open
-8.8.8.8:        Port 21(ftp) is Open
-8.8.8.8:        Port 143(imap) is Open
-8.8.8.8:        Port 110(pop3) is Open
-8.8.8.8:        Port 113(ident) is Closed
 8.8.8.8:        Port 443(https) is Open
-8.8.8.8:        Port 8008(http-alt) is Open
-8.8.8.8:        Port 119(nntp) is Open
-8.8.8.8:        Port 8010 is Open
+8.8.8.8:        Port 53(domain) is Open
+8.8.8.8:        Port 853(domain-s) is Open
 ```
 
 ## An issue on macOS
