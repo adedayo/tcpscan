@@ -21,7 +21,16 @@ var (
 	psrCache            = make(map[string]PersistedScanRequest)
 	lock                = sync.RWMutex{}
 	scanCacheLock       = sync.RWMutex{}
+	myLogger            = logger{}
 )
+
+type logger struct {
+}
+
+func (log logger) Errorf(format string, params ...interface{})   {}
+func (log logger) Warningf(format string, params ...interface{}) {}
+func (log logger) Infof(format string, params ...interface{})    {}
+func (log logger) Debugf(format string, params ...interface{})   {}
 
 //ListScans returns the ScanID list of  persisted scans
 func ListScans(rewindDays int, completed bool) (result []ScanRequest) {
@@ -71,6 +80,7 @@ func ListScans(rewindDays int, completed bool) (result []ScanRequest) {
 func PersistScans(psr PersistedScanRequest, server string, scans []PortACK) {
 	dbDir := filepath.Join(baseScanDBDirectory, psr.Request.Day, psr.Request.ScanID)
 	opts := badger.DefaultOptions(dbDir)
+	opts.Logger = myLogger
 	opts.NumVersionsToKeep = 0
 	db, err := badger.Open(opts)
 	if err != nil {
@@ -94,6 +104,7 @@ func LoadScanRequest(dir, scanID string) (psr PersistedScanRequest, e error) {
 	lock.Unlock()
 	dbDir := filepath.Join(baseScanDBDirectory, dir, scanID, "request")
 	opts := badger.DefaultOptions(dbDir)
+	opts.Logger = myLogger
 	opts.ReadOnly = true
 	db, err := badger.Open(opts)
 	if err != nil {
@@ -163,6 +174,7 @@ func marshallPortAcks(s []PortACK) []byte {
 func PersistScanRequest(psr PersistedScanRequest) {
 	dbDir := filepath.Join(baseScanDBDirectory, psr.Request.Day, psr.Request.ScanID, "request")
 	opts := badger.DefaultOptions(dbDir)
+	opts.Logger = myLogger
 	opts.NumVersionsToKeep = 0
 	db, err := badger.Open(opts)
 	if err != nil {
@@ -181,6 +193,7 @@ func CompactDB(dayPath, scanID string) {
 	//compact the scan requests
 	dbDir := filepath.Join(baseScanDBDirectory, dayPath, scanID, "request")
 	opts := badger.DefaultOptions(dbDir)
+	opts.Logger = myLogger
 	opts.NumVersionsToKeep = 0
 	db, err := badger.Open(opts)
 	if err != nil {
